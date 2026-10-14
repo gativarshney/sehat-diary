@@ -6,7 +6,7 @@ Its one defining behaviour: when it is not sure it heard a number correctly, it 
 
 Built for the Great Indian AI Internship Challenge 2026 on Gnani AI's speech models:
 
-- Gnani Prisma v2.5 speech-to-text (REST `/stt/v3`, `format=transcribe`, word boosting)
+- Gnani Prisma v2.5 speech-to-text (REST `/stt/v3` with `format=transcribe` and word boosting; realtime `/stt/v3/stream` through a server-side WebSocket proxy)
 - Gnani Timbre text-to-speech (REST `/api/v1/tts/inference`)
 
 ## What it is not
@@ -17,9 +17,10 @@ It is not a medical device and gives no advice, thresholds or interpretation. It
 
 ```
 packages/hinglish-numbers/   Deterministic Hindi/Hinglish number parser with a doubt flag (shared by API and web)
-apps/api/                    Hono API on Node: key-holding proxy to Gnani, parse endpoint, cached TTS, credit ledger, mock mode
-apps/web/                    Vite + React PWA: push-to-talk capture, doubt-aware read-back, local history, E-min recorder
-bench/emin/                  Pre-registered 12-utterance feasibility test (protocol, cases, runner)
+apps/api/                    Hono API on Node: key-holding proxy to Gnani (REST and realtime WebSocket), parse endpoint, cached TTS, credit ledger, rate limit, mock mode
+apps/web/                    Vite + React PWA: push-to-talk or streaming capture, doubt-aware read-back, daily check-in, phone mode, history and trends, benchmark recorders
+bench/                       Pre-registered E-min and Tier A sets, impairment generator, runners and scoring (results private)
+docs/                        ARCHITECTURE.md, METHOD.md, DEPLOY.md
 ```
 
 ## Development
@@ -29,7 +30,9 @@ npm install
 npm test                 # parser + API tests, no network
 npm run dev:api          # http://localhost:8000 (mock mode by default)
 npm run dev:web          # http://localhost:5173 (proxies /api to the API)
-npm run emin             # E-min runner in mock mode; --live only after approval
+npm run emin             # E-min runner in mock mode; -- --live only after approval
+npm run tier-a           # Tier A runner (cached, private results)
+npm run check:secrets    # fails if anything key-like is tracked by git
 ```
 
 Copy `.env.example` to `.env` for live mode. Live calls require `GNANI_MODE=live`, a key in `.env`, and an explicit `--live` flag on scripts. Every live call is logged to a local ledger with an estimated credit cost and refused beyond `GNANI_MAX_CREDITS`.
