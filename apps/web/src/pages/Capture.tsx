@@ -75,11 +75,23 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
     stopResolver.current = null
   }
 
-  async function captureReading() {
+  /** Sample path: no microphone, uses the selected mock transcript through the same pipeline. */
+  async function captureSample() {
+    return captureReading(true)
+  }
+
+  async function captureReading(sample = false) {
     setErr(null)
     setDraft(null)
     try {
-      const { blob } = await listen()
+      let blob: Blob
+      if (sample) {
+        // 0.5 s of silence as a stand-in clip; the API is in mock mode so no credits are involved
+        const { encodeWav } = await import('../lib/wav')
+        blob = encodeWav(new Int16Array(8000), 16000)
+      } else {
+        blob = (await listen()).blob
+      }
       setPhase('processing')
       const s = await stt(blob, isMock ? mockText : undefined)
       const p = await parse(s.transcript)
@@ -183,13 +195,16 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
                 </option>
               ))}
             </select>
-          </label>
+          </label>{' '}
+          <button onClick={captureSample} disabled={phase !== 'idle' && phase !== 'saved' && phase !== 'error'}>
+            Try sample (no mic)
+          </button>
         </div>
       )}
 
       <div className="big">
         {phase === 'idle' || phase === 'saved' || phase === 'error' ? (
-          <button className="mic" onClick={captureReading}>
+          <button className="mic" onClick={() => captureReading()}>
             बोलिए
           </button>
         ) : phase === 'listening' ? (

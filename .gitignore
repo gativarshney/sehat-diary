@@ -34,3 +34,6 @@ Thumbs.db
 
 # workspace caches
 .cache/
+
+# local agent/editor config
+.claude/
