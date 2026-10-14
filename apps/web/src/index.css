@@ -53,3 +53,8 @@ button.mic.active { background: var(--accent-2); animation: pulse 1.2s infinite;
 .case-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
 audio { height: 32px; }
 footer { margin-top: 32px; }
+.turns { list-style: none; padding: 0; }
+.turns li { padding: 6px 0; }
+.turns li.app { color: var(--fg); }
+.turns li.user { color: var(--accent-2); }
+.who { margin-right: 6px; }

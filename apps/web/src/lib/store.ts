@@ -73,10 +73,10 @@ export async function deleteEntry(id: string): Promise<void> {
 
 export function toCsv(rows: Entry[]): string {
   const esc = (s: string) => `"${s.replace(/"/g, '""')}"`
-  const lines = ['time,kind,final_values,heard_values,heard_text,doubt,corrected']
+  const lines = ['time,kind,final_values,note,heard_values,heard_text,doubt,corrected']
   for (const r of rows) {
     lines.push(
-      [new Date(r.ts).toISOString(), r.kind, r.finalValues.join(' '), r.heardValues.join(' '), esc(r.heard), r.doubt, r.corrected].join(','),
+      [new Date(r.ts).toISOString(), r.kind, r.finalValues.join(' '), esc(r.note ?? ''), r.heardValues.join(' '), esc(r.heard), r.doubt, r.corrected].join(','),
     )
   }
   return lines.join('\n')

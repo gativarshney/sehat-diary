@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { health } from './lib/api'
 import Capture from './pages/Capture'
+import CheckIn from './pages/CheckIn'
 import EminRecorder from './pages/EminRecorder'
 import History from './pages/History'
 
@@ -54,6 +55,7 @@ export default function App() {
         बोलिए: "BP ek sau atthais by bayasi", "sugar fasting dedh sau", "weight chauvan point paanch". जहाँ शक हो, वहीं पूछेगा।
       </p>
       <Capture apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
+      <CheckIn apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
       <History refreshKey={refreshKey} />
       <footer className="muted small">
         Not a medical device. No advice. Synthetic data in demos. Built on Gnani Prisma and Timbre. <a href="#/record-emin">E-min recorder</a>

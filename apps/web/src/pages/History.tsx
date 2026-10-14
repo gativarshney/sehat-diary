@@ -35,7 +35,11 @@ export default function History({ refreshKey }: { refreshKey: number }) {
           <li key={r.id}>
             <span className="muted">{new Date(r.ts).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>{' '}
             <strong>{r.kind}</strong>{' '}
-            {r.kind === 'bp' && r.finalValues.length >= 2 ? `${r.finalValues[0]}/${r.finalValues[1]}` : r.finalValues.join(' ')}
+            {r.kind === 'medicine'
+              ? r.note ?? (r.finalValues[0] ? 'li' : 'nahi li')
+              : r.kind === 'bp' && r.finalValues.length >= 2
+                ? `${r.finalValues[0]}/${r.finalValues[1]}`
+                : r.finalValues.join(' ')}
             {r.corrected && <span className="tag">corrected</span>}
             {r.doubt && !r.corrected && <span className="tag">confirmed</span>}
             <button className="link" onClick={() => remove(r.id)} aria-label="delete">
