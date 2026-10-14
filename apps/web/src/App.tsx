@@ -19,10 +19,25 @@ export default function App() {
   const [mode, setMode] = useState<string>('offline')
   const [refreshKey, setRefreshKey] = useState(0)
 
+  // The free API instance sleeps when idle; poll health until it answers (about a minute on cold start).
   useEffect(() => {
-    health()
-      .then((h) => setMode(h.mode))
-      .catch(() => setMode('offline'))
+    let cancelled = false
+    let attempts = 0
+    const tick = async () => {
+      try {
+        const h = await health()
+        if (!cancelled) setMode(h.mode)
+      } catch {
+        if (cancelled) return
+        attempts++
+        setMode(attempts < 12 ? 'waking' : 'offline')
+        if (attempts < 12) setTimeout(tick, 5000)
+      }
+    }
+    void tick()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (route.startsWith('#/record-emin')) return <EminRecorder />
@@ -31,7 +46,9 @@ export default function App() {
     <main className="wrap">
       <header className="row between">
         <h1>सेहत डायरी</h1>
-        <span className={`pill ${mode}`}>{mode === 'live' ? 'live' : mode === 'mock' ? 'mock (no credits)' : 'API offline'}</span>
+        <span className={`pill ${mode}`}>
+          {mode === 'live' ? 'live' : mode === 'mock' ? 'mock (no credits)' : mode === 'waking' ? 'server waking up...' : 'API offline'}
+        </span>
       </header>
       <p className="muted">
         बोलिए: "BP ek sau atthais by bayasi", "sugar fasting dedh sau", "weight chauvan point paanch". जहाँ शक हो, वहीं पूछेगा।

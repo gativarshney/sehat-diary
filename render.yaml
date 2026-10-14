@@ -1,0 +1,23 @@
+# Render Blueprint for the API (free web service). The web app is deployed separately on Cloudflare Pages.
+# Secrets (GNANI_API_KEY) are set in the Render dashboard, never here.
+services:
+  - type: web
+    name: sehat-diary-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm run start -w apps/api
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: GNANI_MODE
+        value: mock
+      - key: GNANI_MAX_CREDITS
+        value: "50"
+      - key: SEHAT_CORS_ORIGINS
+        value: https://sehat-diary.pages.dev,http://localhost:5173
+      - key: SEHAT_LIVE_PER_IP_PER_HOUR
+        value: "20"
+      - key: GNANI_API_KEY
+        sync: false

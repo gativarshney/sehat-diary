@@ -18,6 +18,7 @@ import { cors } from 'hono/cors'
 import { parseNumbers } from 'hinglish-numbers'
 import { CreditCapExceeded } from './ledger'
 import { GnaniClient } from './gnani'
+import { RateLimiter, clientIp } from './ratelimit'
 import { wavInfo } from './wav'
 
 function wavResponse(bytes: Uint8Array, headers: Record<string, string>): Response {
@@ -33,6 +34,8 @@ export interface AppOptions {
   client: GnaniClient
   cacheDir: string
   corsOrigins?: string[]
+  /** live calls allowed per client IP per hour (default 20); sample/mock paths are never limited */
+  livePerIpPerHour?: number
 }
 
 export function buildApp(opts: AppOptions) {
@@ -40,6 +43,8 @@ export function buildApp(opts: AppOptions) {
   if (!existsSync(cacheDir)) mkdirSync(cacheDir, { recursive: true })
   const app = new Hono()
   app.use('*', cors({ origin: opts.corsOrigins ?? ['http://localhost:5173'] }))
+  const limiter = new RateLimiter(opts.livePerIpPerHour ?? 20, 60 * 60 * 1000)
+  const liveAllowed = (headers: Headers) => client.mode !== 'live' || limiter.allow(clientIp(headers))
 
   app.get('/healthz', (c) => c.json({ ok: true, mode: client.mode }))
 
@@ -84,6 +89,7 @@ export function buildApp(opts: AppOptions) {
     if (client.mode !== 'live') {
       return c.json({ transcript: mockText || SAMPLE_MOCK_TRANSCRIPT, request_id: 'mock', mock: true, seconds })
     }
+    if (!liveAllowed(c.req.raw.headers)) return c.json({ error: 'rate limit: try again later' }, 429)
     try {
       const r = await client.transcribe(bytes, 'api-clip', { languageCode, purpose: 'api-stt' })
       return c.json({ transcript: r.transcript, request_id: r.requestId, mock: false, seconds })
@@ -106,6 +112,7 @@ export function buildApp(opts: AppOptions) {
     if (existsSync(cached)) {
       return wavResponse(readFileSync(cached), { 'X-Cache': 'hit', 'X-Mock': 'false' })
     }
+    if (!liveAllowed(c.req.raw.headers)) return c.json({ error: 'rate limit: try again later' }, 429)
     try {
       const audio = await client.synthesize(body.text, { voice, model, language, purpose: 'api-tts' })
       if (client.mode === 'live') writeFileSync(cached, audio)
