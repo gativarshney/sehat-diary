@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { parse, stt, tts, type ParseResult } from '../lib/api'
+import { API_BASE, parse, stt, tts, type ParseResult } from '../lib/api'
+import { StreamClient, wsBaseFromApiBase } from '../lib/stream'
 import { guessKind, interpretConfirmation, readbackText } from '../lib/dialogue'
 import { Recorder } from '../lib/recorder'
 import { saveEntry, type Entry, type Kind } from '../lib/store'
@@ -33,6 +34,9 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
   const [err, setErr] = useState<string | null>(null)
   const [mockText, setMockText] = useState(SAMPLES[0])
   const [phoneMode, setPhoneMode] = useState<'off' | 'quiet' | 'noisy'>('off')
+  const [streaming, setStreaming] = useState(false)
+  const [liveSegments, setLiveSegments] = useState<string[]>([])
+  const streamRef = useRef<StreamClient | null>(null)
   const rec = useRef<Recorder | null>(null)
   const audio = useRef<HTMLAudioElement | null>(null)
   const isMock = apiMode !== 'live'
@@ -76,6 +80,25 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
     stopResolver.current = null
   }
 
+  /** Streaming path: segments arrive while speaking; stop joins them into one utterance. */
+  async function listenStreaming(): Promise<string> {
+    setLiveSegments([])
+    const sc = new StreamClient(wsBaseFromApiBase(API_BASE), 'hi-IN')
+    sc.onEvent = (e) => {
+      if (e.type === 'transcript' && e.text) setLiveSegments((s) => [...s, e.text!])
+    }
+    streamRef.current = sc
+    await sc.start()
+    setPhase('listening')
+    await new Promise<void>((res) => {
+      stopResolver.current = res
+    })
+    setPhase('processing')
+    const text = await sc.stop()
+    streamRef.current = null
+    return text
+  }
+
   /** Sample path: no microphone, uses the selected mock transcript through the same pipeline. */
   async function captureSample() {
     return captureReading(true)
@@ -85,16 +108,22 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
     setErr(null)
     setDraft(null)
     try {
-      let blob: Blob
+      let transcript: string
       if (sample) {
         // 0.5 s of silence as a stand-in clip; the API is in mock mode so no credits are involved
         const { encodeWav } = await import('../lib/wav')
-        blob = encodeWav(new Int16Array(8000), 16000)
+        const s = await stt(encodeWav(new Int16Array(8000), 16000), isMock ? mockText : undefined)
+        transcript = s.transcript
+      } else if (streaming) {
+        transcript = await listenStreaming()
       } else {
-        blob = (await listen()).blob
+        const { blob } = await listen()
+        setPhase('processing')
+        const s = await stt(blob, isMock ? mockText : undefined)
+        transcript = s.transcript
       }
       setPhase('processing')
-      const s = await stt(blob, isMock ? mockText : undefined)
+      const s = { transcript }
       const p = await parse(s.transcript)
       const kind = guessKind(s.transcript, p)
       const rb = readbackText(kind, p)
@@ -206,11 +235,14 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
       <div className="row phonebar">
         <label className="muted small">
           Phone mode (8 kHz band-limit, in-browser):{' '}
-          <select value={phoneMode} onChange={(e) => setPhoneMode(e.target.value as 'off' | 'quiet' | 'noisy')}>
+          <select value={phoneMode} onChange={(e) => setPhoneMode(e.target.value as 'off' | 'quiet' | 'noisy')} disabled={streaming}>
             <option value="off">off</option>
             <option value="quiet">quiet line</option>
             <option value="noisy">noisy line</option>
           </select>
+        </label>
+        <label className="muted small">
+          <input type="checkbox" checked={streaming} onChange={(e) => setStreaming(e.target.checked)} /> streaming (live segments, beta)
         </label>
       </div>
       <div className="big">
@@ -229,6 +261,9 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
         )}
       </div>
 
+      {streaming && phase === 'listening' && liveSegments.length > 0 && (
+        <div className="muted small">live: {liveSegments.join(' | ')}</div>
+      )}
       {draft && (
         <div className="card">
           <div className="row">

@@ -13,6 +13,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: node scripts/check-secrets.mjs
       - run: npm test
       - run: npx tsc --noEmit -p packages/hinglish-numbers
       - run: npx tsc --noEmit -p apps/api

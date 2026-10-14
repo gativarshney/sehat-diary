@@ -16,7 +16,8 @@
     "dev:web": "npm run dev -w apps/web",
     "emin": "tsx bench/emin/run-emin.ts",
     "test:bench": "vitest run --root bench",
-    "tier-a": "tsx bench/tier-a/run-tier-a.ts"
+    "tier-a": "tsx bench/tier-a/run-tier-a.ts",
+    "check:secrets": "node scripts/check-secrets.mjs"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

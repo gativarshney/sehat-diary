@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path'
 import { buildApp } from './app'
 import { GnaniClient } from './gnani'
 import { Ledger } from './ledger'
+import { RateLimiter } from './ratelimit'
+import { attachStreamProxy } from './stream'
 
 const ROOT = resolve(import.meta.dirname, '..', '..', '..')
 config({ path: join(ROOT, '.env') })
@@ -20,6 +22,14 @@ const app = buildApp({
 })
 
 const port = Number(process.env.PORT ?? 8000)
-serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
+const httpServer = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info) => {
   console.log(`sehat-diary api listening on :${info.port} mode=${client.mode} cap=${ledger.maxCredits} credits`)
+})
+const biasList = (process.env.SEHAT_BIAS_LIST ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+attachStreamProxy(httpServer as unknown as import('node:http').Server, {
+  mode: client.mode,
+  apiKey: process.env.GNANI_API_KEY,
+  ledger,
+  limiter: new RateLimiter(Number(process.env.SEHAT_LIVE_PER_IP_PER_HOUR ?? 20), 60 * 60 * 1000),
+  biasList,
 })
