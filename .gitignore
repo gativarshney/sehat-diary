@@ -31,3 +31,6 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# workspace caches
+.cache/

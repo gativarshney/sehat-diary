@@ -1,0 +1,26 @@
+{
+  "name": "sehat-diary",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hinglish voice record-keeper for home health readings that confirms what it is unsure about. Built on Gnani Prisma and Timbre.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "emin": "tsx bench/emin/run-emin.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "~6.0.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

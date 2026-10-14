@@ -1,0 +1,20 @@
+{
+  "name": "hinglish-numbers",
+  "version": "0.1.0",
+  "description": "Deterministic parser for spoken Hinglish numbers (Devanagari or Roman, digits or words, fraction words like dedh/dhai/sawa/paune) with an explicit doubt flag.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "^3.2.4"
+  }
+}

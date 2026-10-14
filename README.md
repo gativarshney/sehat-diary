@@ -13,29 +13,26 @@ Built for the Great Indian AI Internship Challenge 2026 on Gnani AI's speech mod
 
 It is not a medical device and gives no advice, thresholds or interpretation. It records, confirms, corrects and keeps history for the family to share with their doctor. All demo data is synthetic.
 
-## Status
-
-Day 1: repository scaffold, mock client, credit ledger, and the pre-registered E-min feasibility test (`bench/emin/`). No live API calls have been made yet.
-
-## Layout
+## Layout (TypeScript monorepo, npm workspaces)
 
 ```
-apps/api/            Python service code (Gnani client with mock mode, credit ledger)
-packages/hinglish_numbers/   Hindi/Hinglish number parser (Python; TypeScript port planned)
-bench/emin/          Pre-registered 12-utterance feasibility test (protocol, cases, runner)
-tests/               Unit tests (run without network)
+packages/hinglish-numbers/   Deterministic Hindi/Hinglish number parser with a doubt flag (shared by API and web)
+apps/api/                    Hono API on Node: key-holding proxy to Gnani, parse endpoint, cached TTS, credit ledger, mock mode
+apps/web/                    Vite + React PWA: push-to-talk capture, doubt-aware read-back, local history, E-min recorder
+bench/emin/                  Pre-registered 12-utterance feasibility test (protocol, cases, runner)
 ```
 
 ## Development
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-pytest -q
+npm install
+npm test                 # parser + API tests, no network
+npm run dev:api          # http://localhost:8000 (mock mode by default)
+npm run dev:web          # http://localhost:5173 (proxies /api to the API)
+npm run emin             # E-min runner in mock mode; --live only after approval
 ```
 
-Live calls require `GNANI_MODE=live`, a key in `.env`, and an explicit `--live` flag on scripts. Every live call is logged to a local ledger with an estimated credit cost and refused beyond `GNANI_MAX_CREDITS`.
+Copy `.env.example` to `.env` for live mode. Live calls require `GNANI_MODE=live`, a key in `.env`, and an explicit `--live` flag on scripts. Every live call is logged to a local ledger with an estimated credit cost and refused beyond `GNANI_MAX_CREDITS`.
 
 ## Evaluation and disclosure
 
