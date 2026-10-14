@@ -4,6 +4,7 @@ import Capture from './pages/Capture'
 import CheckIn from './pages/CheckIn'
 import EminRecorder from './pages/EminRecorder'
 import History from './pages/History'
+import TierARecorder from './pages/TierARecorder'
 
 function useHashRoute(): string {
   const [route, setRoute] = useState(window.location.hash || '#/')
@@ -42,6 +43,7 @@ export default function App() {
   }, [])
 
   if (route.startsWith('#/record-emin')) return <EminRecorder />
+  if (route.startsWith('#/record-tier-a')) return <TierARecorder />
 
   return (
     <main className="wrap">
@@ -58,7 +60,7 @@ export default function App() {
       <CheckIn apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
       <History refreshKey={refreshKey} />
       <footer className="muted small">
-        Not a medical device. No advice. Synthetic data in demos. Built on Gnani Prisma and Timbre. <a href="#/record-emin">E-min recorder</a>
+        Not a medical device. No advice. Synthetic data in demos. Built on Gnani Prisma and Timbre. <a href="#/record-emin">E-min recorder</a> · <a href="#/record-tier-a">Tier A recorder</a>
       </footer>
     </main>
   )
