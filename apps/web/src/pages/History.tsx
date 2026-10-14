@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { deleteEntry, listEntries, toCsv, type Entry } from '../lib/store'
+import Trend from './Trend'
 
 export default function History({ refreshKey }: { refreshKey: number }) {
   const [rows, setRows] = useState<Entry[]>([])
@@ -29,6 +30,7 @@ export default function History({ refreshKey }: { refreshKey: number }) {
           CSV
         </button>
       </div>
+      <Trend rows={rows} />
       {!rows.length && <p className="muted">अभी कोई रिकॉर्ड नहीं।</p>}
       <ul>
         {rows.map((r) => (

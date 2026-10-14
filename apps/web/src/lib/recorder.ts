@@ -1,3 +1,4 @@
+import { phoneDegrade, type PhoneOptions } from './phone'
 import { encodeWav, floatTo16, resample } from './wav'
 
 export const TARGET_RATE = 16000
@@ -54,8 +55,8 @@ export class Recorder {
     this.startedAt = performance.now()
   }
 
-  /** Stop and return the WAV blob plus duration in seconds. */
-  async stop(): Promise<{ blob: Blob; seconds: number }> {
+  /** Stop and return the WAV blob plus duration in seconds. Pass phone options to degrade the clip. */
+  async stop(phone?: PhoneOptions | null): Promise<{ blob: Blob; seconds: number }> {
     const total = this.chunks.reduce((n, c) => n + c.length, 0)
     const merged = new Float32Array(total)
     let off = 0
@@ -69,7 +70,8 @@ export class Recorder {
     this.node = null
     this.stream = null
     this.ctx = null
-    const pcm = resample(merged, this.inputRate, TARGET_RATE)
+    let pcm = resample(merged, this.inputRate, TARGET_RATE)
+    if (phone) pcm = phoneDegrade(pcm, TARGET_RATE, phone)
     const blob = encodeWav(floatTo16(pcm), TARGET_RATE)
     const seconds = pcm.length / TARGET_RATE
     void this.startedAt

@@ -58,3 +58,6 @@ footer { margin-top: 32px; }
 .turns li.app { color: var(--fg); }
 .turns li.user { color: var(--accent-2); }
 .who { margin-right: 6px; }
+.sparks { display: flex; gap: 16px; flex-wrap: wrap; }
+.spark { color: var(--accent-2); }
+.phonebar { margin-top: 8px; }

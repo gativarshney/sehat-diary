@@ -32,6 +32,7 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
   const [draft, setDraft] = useState<Draft | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [mockText, setMockText] = useState(SAMPLES[0])
+  const [phoneMode, setPhoneMode] = useState<'off' | 'quiet' | 'noisy'>('off')
   const rec = useRef<Recorder | null>(null)
   const audio = useRef<HTMLAudioElement | null>(null)
   const isMock = apiMode !== 'live'
@@ -65,7 +66,7 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
     await new Promise<void>((res) => {
       stopResolver.current = res
     })
-    const out = await rec.current.stop()
+    const out = await rec.current.stop(phoneMode === 'off' ? null : { noiseLevel: phoneMode === 'noisy' ? 0.12 : 0.03, seed: 42 })
     rec.current = null
     return out
   }
@@ -202,6 +203,16 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
         </div>
       )}
 
+      <div className="row phonebar">
+        <label className="muted small">
+          Phone mode (8 kHz band-limit, in-browser):{' '}
+          <select value={phoneMode} onChange={(e) => setPhoneMode(e.target.value as 'off' | 'quiet' | 'noisy')}>
+            <option value="off">off</option>
+            <option value="quiet">quiet line</option>
+            <option value="noisy">noisy line</option>
+          </select>
+        </label>
+      </div>
       <div className="big">
         {phase === 'idle' || phase === 'saved' || phase === 'error' ? (
           <button className="mic" onClick={() => captureReading()}>
