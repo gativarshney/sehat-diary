@@ -1,0 +1,46 @@
+import { useEffect, useState } from 'react'
+import { health } from './lib/api'
+import Capture from './pages/Capture'
+import EminRecorder from './pages/EminRecorder'
+import History from './pages/History'
+
+function useHashRoute(): string {
+  const [route, setRoute] = useState(window.location.hash || '#/')
+  useEffect(() => {
+    const on = () => setRoute(window.location.hash || '#/')
+    window.addEventListener('hashchange', on)
+    return () => window.removeEventListener('hashchange', on)
+  }, [])
+  return route
+}
+
+export default function App() {
+  const route = useHashRoute()
+  const [mode, setMode] = useState<string>('offline')
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  useEffect(() => {
+    health()
+      .then((h) => setMode(h.mode))
+      .catch(() => setMode('offline'))
+  }, [])
+
+  if (route.startsWith('#/record-emin')) return <EminRecorder />
+
+  return (
+    <main className="wrap">
+      <header className="row between">
+        <h1>सेहत डायरी</h1>
+        <span className={`pill ${mode}`}>{mode === 'live' ? 'live' : mode === 'mock' ? 'mock (no credits)' : 'API offline'}</span>
+      </header>
+      <p className="muted">
+        बोलिए: "BP ek sau atthais by bayasi", "sugar fasting dedh sau", "weight chauvan point paanch". जहाँ शक हो, वहीं पूछेगा।
+      </p>
+      <Capture apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
+      <History refreshKey={refreshKey} />
+      <footer className="muted small">
+        Not a medical device. No advice. Synthetic data in demos. Built on Gnani Prisma and Timbre. <a href="#/record-emin">E-min recorder</a>
+      </footer>
+    </main>
+  )
+}
