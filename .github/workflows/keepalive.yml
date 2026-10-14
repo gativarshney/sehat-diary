@@ -1,0 +1,14 @@
+# Optional: ping the Render free instance during announced demo windows so it does not sleep.
+# Does nothing unless the repository variable RENDER_HEALTH_URL is set (Settings > Secrets and variables > Actions > Variables).
+# Schedule is deliberately narrow (two evening hours IST, which is 13:00 to 15:00 UTC) and can be run on demand.
+name: keepalive
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/10 13-14 * * *'
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: ${{ vars.RENDER_HEALTH_URL != '' }}
+    steps:
+      - run: curl -fsS --max-time 60 "${{ vars.RENDER_HEALTH_URL }}" || echo "not awake yet"
