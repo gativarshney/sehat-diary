@@ -1,0 +1,33 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# private evaluation material (own voice recordings, raw API responses, result numbers)
+bench/**/audio/
+bench/**/results/
+bench/**/cache/
+*.wav
+*.mp3
+*.ogg
+*.m4a
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,95 @@
+# Pre-registered E-min cases. Do not edit after results exist; add amendments to PROTOCOL.md.
+# script_roman: what Gati says (Hinglish). script_dev: the same in Devanagari for reference.
+# expect: numeric values the parser must recover. kind: bp | sugar | weight | correction | none.
+# ambiguous: true when we expect the parser to (correctly) flag doubt.
+
+- id: bp_by
+  script_roman: "BP ek sau atthais by bayasi"
+  script_dev: "बीपी एक सौ अट्ठाईस बाय बयासी"
+  kind: bp
+  expect: [128, 82]
+  ambiguous: false
+
+- id: bp_bata
+  script_roman: "blood pressure ek sau bees bata assi"
+  script_dev: "ब्लड प्रेशर एक सौ बीस बटा अस्सी"
+  kind: bp
+  expect: [120, 80]
+  ambiguous: false
+
+- id: bp_upar_neeche
+  script_roman: "upar ek sau tees neeche pachasi"
+  script_dev: "ऊपर एक सौ तीस नीचे पचासी"
+  kind: bp
+  expect: [130, 85]
+  ambiguous: false
+
+- id: bp_bare_pair
+  script_roman: "BP ek sau chauvan chauranve"
+  script_dev: "बीपी एक सौ चौवन चौरानवे"
+  kind: bp
+  expect: [154, 94]
+  ambiguous: true
+
+- id: sugar_dedh
+  script_roman: "sugar fasting dedh sau"
+  script_dev: "शुगर फास्टिंग डेढ़ सौ"
+  kind: sugar
+  expect: [150]
+  ambiguous: true
+
+- id: sugar_dhai
+  script_roman: "khane ke baad sugar dhai sau"
+  script_dev: "खाने के बाद शुगर ढाई सौ"
+  kind: sugar
+  expect: [250]
+  ambiguous: true
+
+- id: sugar_sawa
+  script_roman: "sugar sawa sau tha"
+  script_dev: "शुगर सवा सौ था"
+  kind: sugar
+  expect: [125]
+  ambiguous: true
+
+- id: sugar_paune
+  script_roman: "sugar paune do sau"
+  script_dev: "शुगर पौने दो सौ"
+  kind: sugar
+  expect: [175]
+  ambiguous: true
+
+- id: weight_point
+  script_roman: "weight chauvan point paanch kilo"
+  script_dev: "वेट चौवन पॉइंट पाँच किलो"
+  kind: weight
+  expect: [54.5]
+  ambiguous: true
+
+- id: weight_dashamlav
+  script_roman: "vajan bahattar dashamlav do"
+  script_dev: "वज़न बहत्तर दशमलव दो"
+  kind: weight
+  expect: [72.2]
+  ambiguous: true
+
+- id: correction
+  script_roman: "nahi, ek sau atthais"
+  script_dev: "नहीं, एक सौ अट्ठाईस"
+  kind: correction
+  expect: [128]
+  ambiguous: false
+
+- id: out_of_domain
+  script_roman: "aaj mausam bahut accha hai"
+  script_dev: "आज मौसम बहुत अच्छा है"
+  kind: none
+  expect: []
+  ambiguous: false
+
+# TTS checks (not part of the hypothesis): same sentence, two voices
+- tts_checks:
+    text: "आपका बीपी एक सौ अट्ठाईस बाय बयासी है। सही है?"
+    voices:
+      - { voice: "Nalini", model: "timbre-v2.5", language: "hi-IN" }
+      - { voice: "Poorvi", model: "timbre-v2.5", language: "hi-en" }
