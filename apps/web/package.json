@@ -7,11 +7,13 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "hinglish-numbers": "*"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -20,10 +22,12 @@
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^3.2.4"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.2.13",
-    "@oxlint/binding-linux-x64-gnu": "1.88.0"
+    "@oxlint/binding-linux-x64-gnu": "1.88.0",
+    "lightningcss-linux-x64-gnu": "1.33.0"
   }
 }

@@ -6,7 +6,7 @@ export function guessKind(text: string, p: ParseResult): Kind {
   const t = text.toLowerCase()
   if (p.bp || /bp|बीपी|blood|प्रेशर|pressure/.test(t)) return 'bp'
   if (/sugar|शुगर|glucose|ग्लूकोज|fasting|फास्टिंग/.test(t)) return 'sugar'
-  if (/weight|वेट|वज़न|वजन|kilo|किलो|kg/.test(t)) return 'weight'
+  if (/weight|वेट|वज़न|वजन|vajan|vazan|wazan|kilo|किलो|kg/.test(t)) return 'weight'
   if (/dawai|दवाई|dawa|दवा|goli|गोली|tablet|टैबलेट/.test(t)) return 'medicine'
   return 'other'
 }
