@@ -1,10 +1,12 @@
-# Render Blueprint for the API (free web service). The web app is deployed separately on Cloudflare Pages.
-# Secrets (GNANI_API_KEY) are set in the Render dashboard, never here.
+# Render Blueprint: free web service for the API (REST + realtime WebSocket proxy) and a free static site for the web app.
+# Secrets (GNANI_API_KEY) are set in the Render dashboard, never here. The API starts in mock mode; the public
+# sample path spends no credits. Switch GNANI_MODE to live in the dashboard only after the key is set.
 services:
   - type: web
     name: sehat-diary-api
     runtime: node
     plan: free
+    region: singapore
     buildCommand: npm ci
     startCommand: npm run start -w apps/api
     healthCheckPath: /healthz
@@ -16,8 +18,28 @@ services:
       - key: GNANI_MAX_CREDITS
         value: "50"
       - key: SEHAT_CORS_ORIGINS
-        value: https://sehat-diary.pages.dev,http://localhost:5173
+        value: https://sehat-diary.onrender.com,http://localhost:5173
       - key: SEHAT_LIVE_PER_IP_PER_HOUR
         value: "20"
+      - key: SEHAT_BIAS_LIST
+        value: sugar,fasting,weight,BP,dawai
+      - key: SEHAT_SUBSTITUTIONS
+        value: '[{"patterns":["बटासी"],"replacement":"बटा अस्सी"}]'
       - key: GNANI_API_KEY
         sync: false
+
+  - type: web
+    name: sehat-diary
+    runtime: static
+    plan: free
+    buildCommand: npm ci && npm run build -w apps/web
+    staticPublishPath: apps/web/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_BASE
+        value: https://sehat-diary-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

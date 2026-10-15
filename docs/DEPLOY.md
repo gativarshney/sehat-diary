@@ -11,7 +11,10 @@ Limits that protect the credit budget on a public URL:
 - `GNANI_MAX_CREDITS`: hard cap on estimated credits this process may spend (ledger, reset on restart).
 - `SEHAT_LIVE_PER_IP_PER_HOUR`: per-visitor cap on live STT/TTS calls; the sample path never spends credits.
 
-## Web on Cloudflare Pages
+## Web on Render (free static site, defined in the same blueprint)
+The blueprint also creates `sehat-diary` as a static site built with `npm ci && npm run build -w apps/web`, publishing `apps/web/dist`, with `VITE_API_BASE` pointing at the API service and a rewrite so the app's routes load directly.
+
+## Alternative: Web on Cloudflare Pages
 1. Cloudflare dashboard: Workers and Pages, Create, Pages, connect the repository.
 2. Build command: `npm ci && npm run build -w apps/web`. Build output directory: `apps/web/dist`. Root directory: `/`.
 3. Environment variable: `VITE_API_BASE=https://<your-render-service>.onrender.com`.
