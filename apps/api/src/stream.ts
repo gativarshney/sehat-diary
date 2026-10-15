@@ -22,6 +22,11 @@ import { Ledger } from './ledger'
 import { RateLimiter, clientIp } from './ratelimit'
 
 export const FRAME_BYTES = 1024
+
+/** JSON with every non-ASCII character escaped, so it is safe as an HTTP header value. */
+export function asciiJson(value: unknown): string {
+  return JSON.stringify(value).replace(/[^\x00-\x7f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'))
+}
 export const SESSION_MAX_MS = 14 * 60 * 1000
 export const UPSTREAM_URL = 'wss://api.vachana.ai/stt/v3/stream'
 
@@ -128,9 +133,17 @@ class Session {
     }
     if (this.o.substitutions?.length) {
       headers['x-enable-substitution'] = 'true'
-      headers['x-substitution-map'] = JSON.stringify(this.o.substitutions.slice(0, 10))
+      headers['x-substitution-map'] = asciiJson(this.o.substitutions.slice(0, 10))
     }
-    const up = new WebSocket(this.o.upstreamUrl ?? UPSTREAM_URL, { headers })
+    let up: WebSocket
+    try {
+      up = new WebSocket(this.o.upstreamUrl ?? UPSTREAM_URL, { headers })
+    } catch (e) {
+      // never let a bad header or URL take the process down; tell the client and close cleanly
+      this.send({ type: 'error', message: `upstream connect failed: ${(e as Error).message}` })
+      this.close(1011, 'upstream connect failed')
+      return
+    }
     this.upstream = up
     const conn = this.connection
     up.on('open', () => {

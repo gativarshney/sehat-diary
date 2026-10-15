@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { WebSocket, WebSocketServer } from 'ws'
 import { Ledger } from '../src/ledger'
 import { RateLimiter } from '../src/ratelimit'
-import { FRAME_BYTES, attachStreamProxy } from '../src/stream'
+import { FRAME_BYTES, asciiJson, attachStreamProxy } from '../src/stream'
 import { tmp } from './helpers'
 
 const servers: Server[] = []
@@ -143,6 +143,21 @@ describe('stream proxy', () => {
     await until(() => code !== 0)
     expect(code).toBe(4429)
     a.close()
+  })
+
+  it('sends a Devanagari substitution map as an ASCII-only header and still connects', async () => {
+    const up = await mockUpstream()
+    const subs = [{ patterns: ['बटासी'], replacement: 'बटा अस्सी' }]
+    expect(/^[\x00-\x7f]*$/.test(asciiJson(subs))).toBe(true)
+    expect(JSON.parse(asciiJson(subs))).toEqual(subs)
+    const { url } = await proxy({ upstreamUrl: up.url, substitutions: subs, biasList: ['sugar', 'dawai'] })
+    const ws = new WebSocket(url)
+    const msgs = collect(ws)
+    await until(() => msgs.some((m) => m.type === 'ready'))
+    expect(up.seen[0].headers['x-enable-substitution']).toBe('true')
+    expect(JSON.parse(String(up.seen[0].headers['x-substitution-map']))).toEqual(subs)
+    expect(up.seen[0].headers['x-bias-list']).toBe('sugar,dawai')
+    ws.close()
   })
 
   it('mock mode emits synthetic transcripts without any upstream', async () => {
