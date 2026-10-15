@@ -36,6 +36,8 @@ export interface AppOptions {
   corsOrigins?: string[]
   /** live calls allowed per client IP per hour (default 20); sample/mock paths are never limited */
   livePerIpPerHour?: number
+  /** whether the realtime WebSocket proxy is available on this deployment (false on serverless hosts) */
+  streaming?: boolean
 }
 
 export function buildApp(opts: AppOptions) {
@@ -46,7 +48,9 @@ export function buildApp(opts: AppOptions) {
   const limiter = new RateLimiter(opts.livePerIpPerHour ?? 20, 60 * 60 * 1000)
   const liveAllowed = (headers: Headers) => client.mode !== 'live' || limiter.allow(clientIp(headers))
 
-  app.get('/healthz', (c) => c.json({ ok: true, mode: client.mode }))
+  const health = { ok: true, mode: client.mode, streaming: opts.streaming ?? true }
+  app.get('/healthz', (c) => c.json(health))
+  app.get('/api/healthz', (c) => c.json(health))
 
   app.get('/api/ledger', (c) =>
     c.json({

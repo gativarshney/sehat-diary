@@ -20,6 +20,7 @@ function useHashRoute(): string {
 export default function App() {
   const route = useHashRoute()
   const [mode, setMode] = useState<string>('offline')
+  const [streaming, setStreaming] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [confirmAll, setConfirmAll] = useState(confirmAllEnabled())
   function toggleConfirmAll(v: boolean) {
@@ -38,7 +39,10 @@ export default function App() {
     const tick = async () => {
       try {
         const h = await health()
-        if (!cancelled) setMode(h.mode)
+        if (!cancelled) {
+          setMode(h.mode)
+          setStreaming(h.streaming !== false)
+        }
       } catch {
         if (cancelled) return
         attempts++
@@ -66,7 +70,7 @@ export default function App() {
       <p className="muted">
         बोलिए: "BP ek sau atthais by bayasi", "sugar fasting dedh sau", "weight chauvan point paanch". जहाँ शक हो, वहीं पूछेगा।
       </p>
-      <Capture apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
+      <Capture apiMode={mode} streamingAvailable={streaming} onSaved={() => setRefreshKey((k) => k + 1)} />
       <CheckIn apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
       <History refreshKey={refreshKey} allowSample={mode === 'mock'} />
       <p className="muted small">

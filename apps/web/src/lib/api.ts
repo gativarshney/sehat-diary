@@ -48,7 +48,8 @@ export async function tts(text: string): Promise<{ url: string; mock: boolean }>
   return { url: URL.createObjectURL(blob), mock }
 }
 
-export async function health(): Promise<{ ok: boolean; mode: string }> {
-  const r = await fetch(`${API_BASE}/healthz`)
+export async function health(): Promise<{ ok: boolean; mode: string; streaming?: boolean }> {
+  const r = await fetch(`${API_BASE}/api/healthz`)
+  if (!r.ok) throw new Error(`health ${r.status}`)
   return r.json()
 }

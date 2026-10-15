@@ -28,7 +28,7 @@ const SAMPLES = [
  * Push-to-talk capture with doubt-aware read-back.
  * Flow: listen -> STT -> parse -> read back (question only if doubtful) -> confirm/correct -> save.
  */
-export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved: () => void }) {
+export default function Capture({ apiMode, streamingAvailable = true, onSaved }: { apiMode: string; streamingAvailable?: boolean; onSaved: () => void }) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -241,9 +241,11 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
             <option value="noisy">noisy line</option>
           </select>
         </label>
-        <label className="muted small">
-          <input type="checkbox" checked={streaming} onChange={(e) => setStreaming(e.target.checked)} /> streaming (live segments, beta)
-        </label>
+        {streamingAvailable && (
+          <label className="muted small">
+            <input type="checkbox" checked={streaming} onChange={(e) => setStreaming(e.target.checked)} /> streaming (live segments, beta)
+          </label>
+        )}
       </div>
       <div className="big">
         {phase === 'idle' || phase === 'saved' || phase === 'error' ? (

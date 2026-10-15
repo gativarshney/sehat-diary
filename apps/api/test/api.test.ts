@@ -11,7 +11,8 @@ function form(audio: Uint8Array<ArrayBuffer>, extra: Record<string, string> = {}
 describe('api', () => {
   it('health and ledger', async () => {
     const { app } = mockApp()
-    expect(await (await app.request('/healthz')).json()).toEqual({ ok: true, mode: 'mock' })
+    expect(await (await app.request('/healthz')).json()).toEqual({ ok: true, mode: 'mock', streaming: true })
+    expect((await (await app.request('/api/healthz')).json()).ok).toBe(true)
     const led = await (await app.request('/api/ledger')).json()
     expect(led.cumulative_est_credits).toBe(0)
     expect(led.mode).toBe('mock')

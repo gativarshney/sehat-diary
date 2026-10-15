@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build -w apps/web",
+  "outputDirectory": "apps/web/dist",
+  "installCommand": "npm ci",
+  "framework": null,
+  "rewrites": [
+    { "source": "/healthz", "destination": "/api/healthz" }
+  ]
+}

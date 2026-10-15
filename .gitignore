@@ -38,3 +38,6 @@ Thumbs.db
 # local agent/editor config
 .claude/
 bench/**/impaired/
+
+# vercel
+.vercel/
