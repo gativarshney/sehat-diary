@@ -26,10 +26,17 @@ const httpServer = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, (info)
   console.log(`sehat-diary api listening on :${info.port} mode=${client.mode} cap=${ledger.maxCredits} credits`)
 })
 const biasList = (process.env.SEHAT_BIAS_LIST ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+let substitutions: { patterns: string[]; replacement: string }[] | undefined
+try {
+  substitutions = process.env.SEHAT_SUBSTITUTIONS ? JSON.parse(process.env.SEHAT_SUBSTITUTIONS) : undefined
+} catch {
+  substitutions = undefined
+}
 attachStreamProxy(httpServer as unknown as import('node:http').Server, {
   mode: client.mode,
   apiKey: process.env.GNANI_API_KEY,
   ledger,
   limiter: new RateLimiter(Number(process.env.SEHAT_LIVE_PER_IP_PER_HOUR ?? 20), 60 * 60 * 1000),
   biasList,
+  substitutions,
 })

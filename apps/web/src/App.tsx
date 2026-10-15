@@ -68,7 +68,7 @@ export default function App() {
       </p>
       <Capture apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
       <CheckIn apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
-      <History refreshKey={refreshKey} />
+      <History refreshKey={refreshKey} allowSample={mode === 'mock'} />
       <p className="muted small">
         <label>
           <input type="checkbox" checked={confirmAll} onChange={(e) => toggleConfirmAll(e.target.checked)} /> confirm every value (on until the doubt

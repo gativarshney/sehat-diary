@@ -18,6 +18,8 @@ const HERE = import.meta.dirname
 const live = process.argv.includes('--live')
 const skipTts = process.argv.includes('--skip-tts')
 const maxArg = process.argv.find((a) => a.startsWith('--max-credits='))
+const onlyArg = process.argv.find((a) => a.startsWith('--only='))
+const only = onlyArg ? onlyArg.split('=')[1].split(',').filter(Boolean) : null
 const maxCredits = maxArg ? Number(maxArg.split('=')[1]) : 2
 
 type Tier = 'tier1' | 'tier2' | 'unrecoverable'
@@ -51,7 +53,7 @@ async function main() {
   const client = new GnaniClient({ mode: live ? 'live' : 'mock', ledger, mockTranscripts: mock })
 
   if (live) {
-    const missing = CASES.filter((c) => !existsSync(join(audioDir, `${c.id}.wav`))).map((c) => c.id)
+    const missing = (only ? CASES.filter((c) => only.includes(c.id)) : CASES).filter((c) => !existsSync(join(audioDir, `${c.id}.wav`))).map((c) => c.id)
     if (missing.length) {
       console.error('missing recordings:', missing.join(', '))
       process.exit(2)
@@ -59,7 +61,9 @@ async function main() {
   }
 
   const rows = []
-  for (const c of CASES) {
+  const selected = only ? CASES.filter((c) => only.includes(c.id)) : CASES
+  if (only) console.log(`follow-up run for: ${selected.map((c) => c.id).join(', ')} (does not replace the official result)`)
+  for (const c of selected) {
     let transcript: string
     let raw: unknown = { mock: true }
     if (live) {
@@ -73,8 +77,14 @@ async function main() {
   }
   const recoverable = rows.filter((r) => r.tier !== 'unrecoverable').length
   const silent = rows.filter((r) => r.silentError).length
-  const decision = recoverable >= 9 ? 'proceed' : recoverable >= 6 ? 'confirm-all mode' : 'fallback: appointment line'
-  console.log(`\nrecoverable: ${recoverable}/12   tier1: ${rows.filter((r) => r.tier === 'tier1').length}   silent errors: ${silent}`)
+  const decision = only
+    ? 'follow-up only (official result unchanged)'
+    : recoverable >= 9
+      ? 'proceed'
+      : recoverable >= 6
+        ? 'confirm-all mode'
+        : 'fallback: appointment line'
+  console.log(`\nrecoverable: ${recoverable}/${rows.length}   tier1: ${rows.filter((r) => r.tier === 'tier1').length}   silent errors: ${silent}`)
   console.log('decision rule ->', decision)
 
   if (live && !skipTts) {
@@ -88,7 +98,7 @@ async function main() {
 
   const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')
   writeFileSync(
-    join(resultsDir, `emin_${live ? 'live' : 'mock'}_${stamp}.json`),
+    join(resultsDir, `emin_${live ? 'live' : 'mock'}${only ? '_followup' : ''}_${stamp}.json`),
     JSON.stringify({ rows, recoverable, silentErrors: silent, decision, ledgerCumulativeEstCredits: ledger.cumulative }, null, 2),
     'utf-8',
   )

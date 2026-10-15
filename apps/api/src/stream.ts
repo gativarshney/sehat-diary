@@ -39,6 +39,7 @@ export interface StreamOptions {
   mockTranscript?: string
   biasList?: string[]
   biasScore?: number
+  substitutions?: { patterns: string[]; replacement: string }[]
 }
 
 export function attachStreamProxy(server: HttpServer, opts: StreamOptions): WebSocketServer {
@@ -124,6 +125,10 @@ class Session {
     if (this.o.biasList?.length) {
       headers['x-bias-list'] = this.o.biasList.join(',')
       headers['x-bias-score'] = String(this.o.biasScore ?? 1.0)
+    }
+    if (this.o.substitutions?.length) {
+      headers['x-enable-substitution'] = 'true'
+      headers['x-substitution-map'] = JSON.stringify(this.o.substitutions.slice(0, 10))
     }
     const up = new WebSocket(this.o.upstreamUrl ?? UPSTREAM_URL, { headers })
     this.upstream = up
