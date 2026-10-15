@@ -1,6 +1,26 @@
 import { useEffect, useState } from 'react'
-import { deleteEntry, listEntries, saveEntry, toCsv, type Entry } from '../lib/store'
+import { deleteEntry, listEntries, saveEntry, toCsv, type Entry, type Kind } from '../lib/store'
 import Trend from './Trend'
+
+const ICON: Record<Kind, string> = { bp: '❤️', sugar: '🩸', weight: '⚖️', medicine: '💊', other: '📝' }
+const LABEL: Record<Kind, string> = { bp: 'बीपी', sugar: 'शुगर', weight: 'वज़न', medicine: 'दवाई', other: 'नोट' }
+
+function valueText(r: Entry): string {
+  if (r.kind === 'medicine') return r.note ?? (r.finalValues[0] ? 'ली' : 'नहीं ली')
+  if (r.kind === 'bp' && r.finalValues.length >= 2) return `${r.finalValues[0]}/${r.finalValues[1]}`
+  return r.finalValues.join(' ')
+}
+
+function dayKey(ts: number): string {
+  const d = new Date(ts)
+  const today = new Date()
+  const y = new Date()
+  y.setDate(today.getDate() - 1)
+  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString()
+  if (same(d, today)) return 'आज'
+  if (same(d, y)) return 'कल'
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
 
 export default function History({ refreshKey, allowSample = false }: { refreshKey: number; allowSample?: boolean }) {
   const [rows, setRows] = useState<Entry[]>([])
@@ -17,7 +37,7 @@ export default function History({ refreshKey, allowSample = false }: { refreshKe
       const sugar = Math.round(118 + rnd() * 30)
       await saveEntry({ id: crypto.randomUUID(), ts, kind: 'bp', heard: `(synthetic) BP ${sys} by ${dia}`, heardValues: [sys, dia], finalValues: [sys, dia], doubt: false, reasons: [], corrected: false, note: 'synthetic' })
       await saveEntry({ id: crypto.randomUUID(), ts: ts + 600000, kind: 'sugar', heard: `(synthetic) sugar fasting ${sugar}`, heardValues: [sugar], finalValues: [sugar], doubt: false, reasons: [], corrected: false, note: 'synthetic' })
-      await saveEntry({ id: crypto.randomUUID(), ts: ts + 900000, kind: 'medicine', heard: '(synthetic) subah ki dawai le li', heardValues: [], finalValues: [1], doubt: false, reasons: [], corrected: false, note: 'li (synthetic)' })
+      await saveEntry({ id: crypto.randomUUID(), ts: ts + 900000, kind: 'medicine', heard: '(synthetic) subah ki dawai le li', heardValues: [], finalValues: [1], doubt: false, reasons: [], corrected: false, note: 'ली (synthetic)' })
     }
     setRows(await listEntries())
   }
@@ -39,42 +59,68 @@ export default function History({ refreshKey, allowSample = false }: { refreshKe
     setRows((r) => r.filter((x) => x.id !== id))
   }
 
+  const groups: { day: string; items: Entry[] }[] = []
+  for (const r of rows) {
+    const k = dayKey(r.ts)
+    const g = groups[groups.length - 1]
+    if (g && g.day === k) g.items.push(r)
+    else groups.push({ day: k, items: [r] })
+  }
+
   return (
-    <section className="history">
-      <div className="row between">
-        <h2>इतिहास (history)</h2>
-        <span>
-          {allowSample && (
-            <button onClick={loadSample} title="adds 14 days of clearly labelled synthetic entries">
-              Load sample history
+    <section>
+      <div className="card">
+        <div className="row between">
+          <div>
+            <h2 style={{ margin: 0 }}>इतिहास</h2>
+            <div className="tiny">Doctor ko dikhane ke liye. Koi salah nahi, sirf record.</div>
+          </div>
+          <div className="row">
+            {allowSample && (
+              <button className="btn sm ghost" onClick={loadSample} title="adds 14 days of clearly labelled synthetic entries">
+                sample data
+              </button>
+            )}
+            <button className="btn sm" onClick={exportCsv} disabled={!rows.length}>
+              CSV export
             </button>
-          )}{' '}
-          <button onClick={exportCsv} disabled={!rows.length}>
-            CSV
-          </button>
-        </span>
+          </div>
+        </div>
       </div>
+
       <Trend rows={rows} />
-      {!rows.length && <p className="muted">अभी कोई रिकॉर्ड नहीं।</p>}
-      <ul>
-        {rows.map((r) => (
-          <li key={r.id}>
-            <span className="muted">{new Date(r.ts).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>{' '}
-            <strong>{r.kind}</strong>{' '}
-            {r.kind === 'medicine'
-              ? r.note ?? (r.finalValues[0] ? 'li' : 'nahi li')
-              : r.kind === 'bp' && r.finalValues.length >= 2
-                ? `${r.finalValues[0]}/${r.finalValues[1]}`
-                : r.finalValues.join(' ')}
-            {r.corrected && <span className="tag">corrected</span>}
-            {r.doubt && !r.corrected && <span className="tag">confirmed</span>}
-            <button className="link" onClick={() => remove(r.id)} aria-label="delete">
-              ×
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p className="muted small">कोई सलाह नहीं। सिर्फ़ रिकॉर्ड। डॉक्टर को दिखाएँ।</p>
+
+      {!rows.length && (
+        <div className="card empty">
+          <div className="big">📒</div>
+          <div>अभी कोई रिकॉर्ड नहीं। "बोलें" tab se pehli reading boliye.</div>
+        </div>
+      )}
+
+      {groups.map((g) => (
+        <div className="day" key={g.day}>
+          <h3>{g.day}</h3>
+          {g.items.map((r) => (
+            <div className="entry" key={r.id}>
+              <div className="ico" aria-hidden="true">
+                {ICON[r.kind]}
+              </div>
+              <div>
+                <div className="kind">
+                  {LABEL[r.kind]}
+                  {r.corrected && <span className="tag" style={{ marginLeft: 8 }}>सुधारा</span>}
+                  {r.doubt && !r.corrected && <span className="tag ok" style={{ marginLeft: 8 }}>पक्का किया</span>}
+                </div>
+                <div className="val">{valueText(r)}</div>
+              </div>
+              <div className="time">{new Date(r.ts).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}</div>
+              <button className="del" onClick={() => remove(r.id)} aria-label="delete entry" title="delete">
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      ))}
     </section>
   )
 }

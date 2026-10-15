@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { API_BASE, parse, stt, tts, type ParseResult } from '../lib/api'
-import { StreamClient, wsBaseFromApiBase } from '../lib/stream'
 import { guessKind, interpretConfirmation, readbackText } from '../lib/dialogue'
 import { Recorder } from '../lib/recorder'
 import { saveEntry, type Entry, type Kind } from '../lib/store'
+import { StreamClient, wsBaseFromApiBase } from '../lib/stream'
 
 type Phase = 'idle' | 'listening' | 'processing' | 'readback' | 'confirming' | 'saved' | 'error'
 
@@ -24,11 +24,22 @@ const SAMPLES = [
   'बीपी एक सौ चौवन चौरानवे',
 ]
 
+const KIND_LABEL: Record<Kind, string> = { bp: 'बीपी', sugar: 'शुगर', weight: 'वज़न', medicine: 'दवाई', other: 'नोट' }
+const KIND_UNIT: Record<Kind, string> = { bp: 'mmHg', sugar: 'mg/dL', weight: 'kg', medicine: '', other: '' }
+
+interface Props {
+  apiMode: string
+  streamingAvailable?: boolean
+  confirmAll: boolean
+  onToggleConfirmAll: (v: boolean) => void
+  onSaved: () => void
+}
+
 /**
  * Push-to-talk capture with doubt-aware read-back.
- * Flow: listen -> STT -> parse -> read back (question only if doubtful) -> confirm/correct -> save.
+ * Flow: listen -> STT -> parse -> read back (question only if doubtful, or always in confirm-all mode) -> confirm/correct -> save.
  */
-export default function Capture({ apiMode, streamingAvailable = true, onSaved }: { apiMode: string; streamingAvailable?: boolean; onSaved: () => void }) {
+export default function Capture({ apiMode, streamingAvailable = true, confirmAll, onToggleConfirmAll, onSaved }: Props) {
   const [phase, setPhase] = useState<Phase>('idle')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -36,10 +47,12 @@ export default function Capture({ apiMode, streamingAvailable = true, onSaved }:
   const [phoneMode, setPhoneMode] = useState<'off' | 'quiet' | 'noisy'>('off')
   const [streaming, setStreaming] = useState(false)
   const [liveSegments, setLiveSegments] = useState<string[]>([])
-  const streamRef = useRef<StreamClient | null>(null)
   const rec = useRef<Recorder | null>(null)
+  const streamRef = useRef<StreamClient | null>(null)
   const audio = useRef<HTMLAudioElement | null>(null)
+  const stopResolver = useRef<(() => void) | null>(null)
   const isMock = apiMode !== 'live'
+  const ready = apiMode === 'live' || apiMode === 'mock'
 
   useEffect(
     () => () => {
@@ -74,13 +87,7 @@ export default function Capture({ apiMode, streamingAvailable = true, onSaved }:
     rec.current = null
     return { blob, seconds }
   }
-  const stopResolver = useRef<(() => void) | null>(null)
-  function stopListening() {
-    stopResolver.current?.()
-    stopResolver.current = null
-  }
 
-  /** Streaming path: segments arrive while speaking; stop joins them into one utterance. */
   async function listenStreaming(): Promise<string> {
     setLiveSegments([])
     const sc = new StreamClient(wsBaseFromApiBase(API_BASE), 'hi-IN')
@@ -99,9 +106,9 @@ export default function Capture({ apiMode, streamingAvailable = true, onSaved }:
     return text
   }
 
-  /** Sample path: no microphone, uses the selected mock transcript through the same pipeline. */
-  async function captureSample() {
-    return captureReading(true)
+  function stopListening() {
+    stopResolver.current?.()
+    stopResolver.current = null
   }
 
   async function captureReading(sample = false) {
@@ -110,11 +117,10 @@ export default function Capture({ apiMode, streamingAvailable = true, onSaved }:
     try {
       let transcript: string
       if (sample) {
-        // 0.5 s of silence as a stand-in clip; the API is in mock mode so no credits are involved
         const { encodeWav } = await import('../lib/wav')
         const s = await stt(encodeWav(new Int16Array(8000), 16000), isMock ? mockText : undefined)
         transcript = s.transcript
-      } else if (streaming) {
+      } else if (streaming && streamingAvailable) {
         transcript = await listenStreaming()
       } else {
         const { blob } = await listen()
@@ -123,13 +129,12 @@ export default function Capture({ apiMode, streamingAvailable = true, onSaved }:
         transcript = s.transcript
       }
       setPhase('processing')
-      const s = { transcript }
-      const p = await parse(s.transcript)
-      const kind = guessKind(s.transcript, p)
-      const rb = readbackText(kind, p)
+      const p = await parse(transcript)
+      const kind = guessKind(transcript, p)
+      const rb = readbackText(kind, p, confirmAll)
       const d: Draft = {
         kind,
-        heard: s.transcript,
+        heard: transcript,
         parsed: p,
         values: p.bp ? [...p.bp] : p.values,
         readback: rb.text,
@@ -167,15 +172,14 @@ export default function Capture({ apiMode, streamingAvailable = true, onSaved }:
     if (!draft) return
     if (type === 'yes') return commit(draft)
     if (type === 'correct' && values) {
-      // one-field correction: replace the doubtful value(s); for BP a single number replaces systolic
       let next = [...draft.values]
       if (draft.kind === 'bp' && values.length === 1) next[0] = values[0]
       else if (draft.kind === 'bp' && values.length >= 2) next = [values[0], values[1]]
       else next = [values[0]]
       const d2 = { ...draft, values: next, corrected: true }
       setDraft(d2)
-      const kindText = readbackText(d2.kind, { ...d2.parsed, values: next, bp: d2.kind === 'bp' ? [next[0], next[1]] : null, doubt: false })
-      await speak(kindText.text)
+      const say = readbackText(d2.kind, { ...d2.parsed, values: next, bp: d2.kind === 'bp' ? [next[0], next[1]] : null, doubt: false }, false)
+      await speak(say.text)
       return commit(d2)
     }
     if (type === 'no') {
@@ -205,95 +209,139 @@ export default function Capture({ apiMode, streamingAvailable = true, onSaved }:
   }
 
   function manualCorrect() {
-    const v = prompt('सही नंबर (e.g. 128 or 128 82):')
+    const v = prompt('सही नंबर (जैसे 128 या 128 82):')
     if (!v) return
     const nums = v.split(/[\s/]+/).map(Number).filter((n) => !Number.isNaN(n))
     if (nums.length) void applyConfirmation(nums, 'correct')
   }
 
+  const idle = phase === 'idle' || phase === 'saved' || phase === 'error'
+  const micLabel =
+    phase === 'listening'
+      ? 'सुन रहा हूँ… दबाकर रोकें'
+      : phase === 'processing'
+        ? 'समझ रहा हूँ'
+        : phase === 'readback'
+          ? 'बोल रहा हूँ'
+          : phase === 'confirming'
+            ? 'पुष्टि कीजिए'
+            : ready
+              ? 'दबाएँ और बोलें'
+              : 'server ka intezaar'
+
   return (
-    <section className="capture">
+    <section>
       <audio ref={audio} hidden />
-      {isMock && (
-        <div className="mockbar">
-          <label>
-            Mock transcript (API is in mock mode, no credits used):{' '}
-            <select value={mockText} onChange={(e) => setMockText(e.target.value)}>
-              {SAMPLES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>{' '}
-          <button onClick={captureSample} disabled={phase !== 'idle' && phase !== 'saved' && phase !== 'error'}>
-            Try sample (no mic)
-          </button>
+      <div className="card hero">
+        <h1>रीडिंग बोलिए</h1>
+        <p>BP, sugar, vajan ya dawai: Hinglish mein bolo. Jahan shak ho, app wahin poochega.</p>
+        <div className="chips">
+          <span className="chip">"BP ek sau atthais by bayasi"</span>
+          <span className="chip">"sugar fasting dedh sau"</span>
+          <span className="chip">"vajan chauvan point paanch"</span>
         </div>
-      )}
-
-      <div className="row phonebar">
-        <label className="muted small">
-          Phone mode (8 kHz band-limit, in-browser):{' '}
-          <select value={phoneMode} onChange={(e) => setPhoneMode(e.target.value as 'off' | 'quiet' | 'noisy')} disabled={streaming}>
-            <option value="off">off</option>
-            <option value="quiet">quiet line</option>
-            <option value="noisy">noisy line</option>
-          </select>
-        </label>
-        {streamingAvailable && (
-          <label className="muted small">
-            <input type="checkbox" checked={streaming} onChange={(e) => setStreaming(e.target.checked)} /> streaming (live segments, beta)
-          </label>
-        )}
-      </div>
-      <div className="big">
-        {phase === 'idle' || phase === 'saved' || phase === 'error' ? (
-          <button className="mic" onClick={() => captureReading()}>
-            बोलिए
-          </button>
-        ) : phase === 'listening' ? (
-          <button className="mic active" onClick={stopListening}>
-            सुन रहा हूँ... (रोकें)
-          </button>
-        ) : (
-          <button className="mic" disabled>
-            {phase === 'processing' ? 'समझ रहा हूँ...' : phase === 'readback' ? 'बोल रहा हूँ...' : 'पुष्टि करें'}
-          </button>
-        )}
+        <div className="mic-wrap">
+          {idle ? (
+            <button className="mic" onClick={() => captureReading()} disabled={!ready} aria-label="record a reading">
+              🎙
+            </button>
+          ) : phase === 'listening' ? (
+            <button className="mic listening" onClick={stopListening} aria-label="stop listening">
+              ■
+            </button>
+          ) : (
+            <button className="mic busy" disabled aria-label={micLabel}>
+              {phase === 'readback' ? '🔊' : '…'}
+            </button>
+          )}
+          <div className={`mic-label ${phase === 'processing' ? 'dots' : ''}`}>{micLabel}</div>
+          {streaming && streamingAvailable && phase === 'listening' && liveSegments.length > 0 && <div className="small muted">{liveSegments.join(' · ')}</div>}
+          {isMock && ready && (
+            <button className="btn sm ghost" onClick={() => captureReading(true)} disabled={!idle}>
+              bina mic ke sample chalayein
+            </button>
+          )}
+        </div>
       </div>
 
-      {streaming && phase === 'listening' && liveSegments.length > 0 && (
-        <div className="muted small">live: {liveSegments.join(' | ')}</div>
-      )}
       {draft && (
-        <div className="card">
-          <div className="row">
-            <div>
-              <div className="label">सुना (heard)</div>
+        <div className="card result">
+          <div className="cols">
+            <div className="col">
+              <div className="label">सुना गया</div>
               <div className="heard">{draft.heard}</div>
-              <div className="muted">parser: {draft.parsed.values.join(', ') || 'no number'} {draft.parsed.doubt ? `· doubt: ${draft.parsed.reasons.join(', ')}` : '· confident'}</div>
+              <div className="tiny" style={{ marginTop: 6 }}>
+                {draft.parsed.values.length ? `numbers: ${draft.parsed.values.join(', ')}` : 'koi number nahi mila'}
+                {draft.parsed.doubt ? ` · shak: ${draft.parsed.reasons.join(', ')}` : draft.parsed.values.length ? ' · pakka' : ''}
+              </div>
             </div>
-            <div>
-              <div className="label">रिकॉर्ड (record)</div>
+            <div className="col">
+              <div className="label">रिकॉर्ड</div>
               <div className="final">
-                {draft.kind} {draft.kind === 'bp' && draft.values.length >= 2 ? `${draft.values[0]} / ${draft.values[1]}` : draft.values.join(' ')}
-                {draft.corrected && <span className="tag">corrected</span>}
-                {phase === 'saved' && <span className="tag ok">saved</span>}
+                {draft.kind === 'medicine' ? 'दवाई ली' : draft.kind === 'bp' && draft.values.length >= 2 ? `${draft.values[0]}/${draft.values[1]}` : draft.values.join(' ')}
+                {KIND_UNIT[draft.kind] && draft.values.length > 0 && <small>{KIND_UNIT[draft.kind]}</small>}
+              </div>
+              <div className="row" style={{ marginTop: 8 }}>
+                <span className="tag info">{KIND_LABEL[draft.kind]}</span>
+                {draft.corrected && <span className="tag">सुधारा</span>}
+                {phase === 'saved' && <span className="tag ok">सेव हो गया</span>}
               </div>
             </div>
           </div>
-          <div className="readback muted">🔊 {draft.readback}</div>
+          <div className="readback">
+            <span className="spk">🔊</span>
+            <span>{draft.readback}</span>
+          </div>
           {phase === 'confirming' && (
             <div className="confirm">
-              <button onClick={() => applyConfirmation(null, 'yes')}>हाँ, सही है</button>
-              <button onClick={confirmByVoice}>बोलकर ठीक करें</button>
-              <button onClick={manualCorrect}>टाइप करके ठीक करें</button>
+              <button className="btn teal" onClick={() => applyConfirmation(null, 'yes')}>
+                हाँ, सही है
+              </button>
+              <button className="btn" onClick={confirmByVoice}>
+                बोलकर ठीक करें
+              </button>
+              <button className="btn ghost" onClick={manualCorrect}>
+                टाइप करें
+              </button>
             </div>
           )}
         </div>
       )}
       {err && <div className="error">{err}</div>}
+
+      <details className="dev">
+        <summary>Settings and developer options</summary>
+        <div className="grid">
+          <label>
+            <input type="checkbox" checked={confirmAll} onChange={(e) => onToggleConfirmAll(e.target.checked)} /> Har value confirm karo (E-min rule; Tier A tak on)
+          </label>
+          <label>
+            Phone mode (8 kHz band-limit, in-browser)
+            <select value={phoneMode} onChange={(e) => setPhoneMode(e.target.value as 'off' | 'quiet' | 'noisy')} disabled={streaming}>
+              <option value="off">off</option>
+              <option value="quiet">quiet line</option>
+              <option value="noisy">noisy line</option>
+            </select>
+          </label>
+          {streamingAvailable && (
+            <label>
+              <input type="checkbox" checked={streaming} onChange={(e) => setStreaming(e.target.checked)} /> Streaming (live segments, beta)
+            </label>
+          )}
+          {isMock && (
+            <label>
+              Mock transcript (demo mode, no credits)
+              <select value={mockText} onChange={(e) => setMockText(e.target.value)}>
+                {SAMPLES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      </details>
     </section>
   )
 }

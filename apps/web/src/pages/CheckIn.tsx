@@ -14,19 +14,22 @@ interface Turn {
 
 /** Scripted answers used when the API is in mock mode (no microphone, no credits). */
 const MOCK_SCRIPT = ['haan le li', 'ek sau atthais by bayasi', 'sugar dedh sau', 'haan']
+const SLOTS = ['medicine', 'bp', 'sugar'] as const
 
 /**
- * Proactive half-duplex check-in: the app asks, then listens; it reads back only doubtful values.
- * Audio in/out is injected here; all dialogue decisions live in lib/checkin.ts.
+ * Proactive half-duplex check-in: the app asks, then listens; it reads back doubtful values
+ * (or every value in confirm-all mode). Audio in/out is injected here; dialogue decisions live in lib/checkin.ts.
  */
 export default function CheckIn({ apiMode, onSaved }: { apiMode: string; onSaved: () => void }) {
   const [phase, setPhase] = useState<UiPhase>('idle')
   const [turns, setTurns] = useState<Turn[]>([])
+  const [progress, setProgress] = useState(0)
   const [err, setErr] = useState<string | null>(null)
   const audio = useRef<HTMLAudioElement | null>(null)
   const rec = useRef<Recorder | null>(null)
   const stopResolver = useRef<(() => void) | null>(null)
   const isMock = apiMode !== 'live'
+  const ready = apiMode === 'live' || apiMode === 'mock'
   const mockIdx = useRef(0)
 
   async function speak(text: string) {
@@ -73,21 +76,24 @@ export default function CheckIn({ apiMode, onSaved }: { apiMode: string; onSaved
   async function run() {
     setErr(null)
     setTurns([])
+    setProgress(0)
     mockIdx.current = 0
     try {
-      let { state, step } = startCheckIn(['medicine', 'bp', 'sugar'])
+      let { state, step } = startCheckIn([...SLOTS])
       while (step.kind !== 'done') {
         await speak(step.text)
         if (step.kind === 'say') {
           ;({ state, step } = answer(state, step, '', emptyParse()))
+          setProgress(state.index)
           continue
         }
         const heard = await listenOnce()
         const p = await parse(heard)
         const prev: Step = step
         ;({ state, step } = answer(state, prev, heard, { ...p }))
+        setProgress(state.index)
         const last = state.answers[state.answers.length - 1]
-        const note = prev.kind === 'confirm' ? (last?.corrected ? 'corrected' : 'confirmed') : p.doubt ? `doubt: ${p.reasons.join(', ')}` : undefined
+        const note = prev.kind === 'confirm' ? (last?.corrected ? 'सुधारा' : 'पक्का') : p.doubt ? `shak: ${p.reasons.join(', ')}` : undefined
         setTurns((t) => [...t, { who: 'user', text: heard, note }])
       }
       await persist(state)
@@ -110,7 +116,7 @@ export default function CheckIn({ apiMode, onSaved }: { apiMode: string; onSaved
         heard: a.heard,
         heardValues: a.values,
         finalValues: a.slot === 'medicine' ? (a.taken ? [1] : [0]) : a.values,
-        doubt: a.reasons.length > 0, // was doubtful at capture time, even if confirmed afterwards
+        doubt: a.reasons.length > 0,
         reasons: a.reasons,
         corrected: a.corrected,
         note: a.slot === 'medicine' ? (a.taken ? 'li' : 'nahi li') : undefined,
@@ -120,28 +126,50 @@ export default function CheckIn({ apiMode, onSaved }: { apiMode: string; onSaved
   }
 
   return (
-    <section className="checkin">
+    <section>
       <audio ref={audio} hidden />
-      <div className="row between">
-        <h2>रोज़ का चेक-इन</h2>
-        {phase === 'idle' || phase === 'done' ? (
-          <button onClick={run}>{isMock ? 'Run sample check-in' : 'शुरू करें'}</button>
-        ) : phase === 'listening' ? (
-          <button className="danger" onClick={stopListening}>
-            सुन रहा हूँ... (रोकें)
-          </button>
-        ) : (
-          <button disabled>{phase === 'speaking' ? 'बोल रहा हूँ...' : 'समझ रहा हूँ...'}</button>
-        )}
+      <div className="card hero">
+        <h1>रोज़ का चेक-इन</h1>
+        <p>App teen sawaal poochega: dawai, BP, sugar. Aap bas jawab boliye. Shak ho to woh number dohra kar poochega.</p>
+        <div className="mic-wrap">
+          {phase === 'idle' || phase === 'done' ? (
+            <button className="btn primary" onClick={run} disabled={!ready} style={{ padding: '14px 28px', fontSize: '1.05rem' }}>
+              {isMock ? 'Sample check-in chalayein' : 'चेक-इन शुरू करें'}
+            </button>
+          ) : phase === 'listening' ? (
+            <button className="mic listening" onClick={stopListening} aria-label="stop listening">
+              ■
+            </button>
+          ) : (
+            <button className="mic busy" disabled>
+              {phase === 'speaking' ? '🔊' : '…'}
+            </button>
+          )}
+          <div className={`mic-label ${phase === 'processing' ? 'dots' : ''}`}>
+            {phase === 'listening' ? 'सुन रहा हूँ… बोलकर रोकें' : phase === 'speaking' ? 'बोल रहा हूँ' : phase === 'processing' ? 'समझ रहा हूँ' : phase === 'done' ? 'हो गया' : ''}
+          </div>
+          {(turns.length > 0 || phase !== 'idle') && (
+            <div className="steps" style={{ width: '100%', maxWidth: 320 }}>
+              {SLOTS.map((s, i) => (
+                <span key={s} className={i < progress ? 'done' : ''} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      <ul className="turns">
-        {turns.map((t, i) => (
-          <li key={i} className={t.who}>
-            <span className="who">{t.who === 'app' ? '🔊' : '🎙'}</span> {t.text}
-            {t.note && <span className="tag">{t.note}</span>}
-          </li>
-        ))}
-      </ul>
+
+      {turns.length > 0 && (
+        <div className="card">
+          <div className="chat">
+            {turns.map((t, i) => (
+              <div key={i} className={`bubble ${t.who}`}>
+                {t.text}
+                {t.note && <span className={`tag ${t.note === 'पक्का' ? 'ok' : ''}`}>{t.note}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {err && <div className="error">{err}</div>}
     </section>
   )

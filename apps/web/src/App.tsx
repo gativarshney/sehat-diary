@@ -7,6 +7,8 @@ import EminRecorder from './pages/EminRecorder'
 import History from './pages/History'
 import TierARecorder from './pages/TierARecorder'
 
+type Tab = 'record' | 'checkin' | 'history'
+
 function useHashRoute(): string {
   const [route, setRoute] = useState(window.location.hash || '#/')
   useEffect(() => {
@@ -19,10 +21,12 @@ function useHashRoute(): string {
 
 export default function App() {
   const route = useHashRoute()
-  const [mode, setMode] = useState<string>('offline')
+  const [mode, setMode] = useState<string>('waking')
   const [streaming, setStreaming] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [tab, setTab] = useState<Tab>('record')
   const [confirmAll, setConfirmAll] = useState(confirmAllEnabled())
+
   function toggleConfirmAll(v: boolean) {
     setConfirmAll(v)
     try {
@@ -46,8 +50,8 @@ export default function App() {
       } catch {
         if (cancelled) return
         attempts++
-        setMode(attempts < 12 ? 'waking' : 'offline')
-        if (attempts < 12) setTimeout(tick, 5000)
+        setMode(attempts < 18 ? 'waking' : 'offline')
+        if (attempts < 18) setTimeout(tick, 5000)
       }
     }
     void tick()
@@ -59,29 +63,52 @@ export default function App() {
   if (route.startsWith('#/record-emin')) return <EminRecorder />
   if (route.startsWith('#/record-tier-a')) return <TierARecorder />
 
+  const statusText = mode === 'live' ? 'Gnani live' : mode === 'mock' ? 'demo mode' : mode === 'waking' ? 'server jaag raha hai' : 'offline'
+
   return (
-    <main className="wrap">
-      <header className="row between">
-        <h1>सेहत डायरी</h1>
-        <span className={`pill ${mode}`}>
-          {mode === 'live' ? 'live' : mode === 'mock' ? 'mock (no credits)' : mode === 'waking' ? 'server waking up...' : 'API offline'}
-        </span>
+    <div className="app">
+      <header className="topbar">
+        <div className="topbar-inner">
+          <div className="logo" aria-hidden="true">
+            स
+          </div>
+          <div className="brand">
+            <strong>सेहत डायरी</strong>
+            <span>बोलो, सुनो, पक्का करो</span>
+          </div>
+          <div className="spacer" />
+          <span className={`pill ${mode}`}>{statusText}</span>
+        </div>
       </header>
-      <p className="muted">
-        बोलिए: "BP ek sau atthais by bayasi", "sugar fasting dedh sau", "weight chauvan point paanch". जहाँ शक हो, वहीं पूछेगा।
-      </p>
-      <Capture apiMode={mode} streamingAvailable={streaming} onSaved={() => setRefreshKey((k) => k + 1)} />
-      <CheckIn apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
-      <History refreshKey={refreshKey} allowSample={mode === 'mock'} />
-      <p className="muted small">
-        <label>
-          <input type="checkbox" checked={confirmAll} onChange={(e) => toggleConfirmAll(e.target.checked)} /> confirm every value (on until the doubt
-          detector is validated)
-        </label>
-      </p>
-      <footer className="muted small">
-        Not a medical device. No advice. Synthetic data in demos. Built on Gnani Prisma and Timbre. <a href="#/record-emin">E-min recorder</a> · <a href="#/record-tier-a">Tier A recorder</a>
-      </footer>
-    </main>
+
+      <nav className="tabbar" aria-label="sections">
+        <div className="tabbar-inner">
+          <button className={`tab ${tab === 'record' ? 'active' : ''}`} onClick={() => setTab('record')}>
+            <span className="ico">🎙</span>बोलें
+          </button>
+          <button className={`tab ${tab === 'checkin' ? 'active' : ''}`} onClick={() => setTab('checkin')}>
+            <span className="ico">☎</span>चेक-इन
+          </button>
+          <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
+            <span className="ico">📒</span>इतिहास
+          </button>
+        </div>
+      </nav>
+
+      <main className="content">
+        {mode === 'waking' && <div className="notice">Server free plan par sota hai; jaagne mein ek minute lag sakta hai. Page khud update hoga.</div>}
+        {tab === 'record' && (
+          <Capture apiMode={mode} streamingAvailable={streaming} confirmAll={confirmAll} onToggleConfirmAll={toggleConfirmAll} onSaved={() => setRefreshKey((k) => k + 1)} />
+        )}
+        {tab === 'checkin' && <CheckIn apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />}
+        {tab === 'history' && <History refreshKey={refreshKey} allowSample={mode === 'mock'} />}
+        <footer className="disclaimer">
+          Yeh medical device nahi hai. Koi salah nahi, sirf record. Demo mein sab data synthetic hai.
+          <br />
+          Built on Gnani Prisma and Timbre · <a href="https://github.com/gativarshney/sehat-diary">open source</a> · <a href="#/record-emin">E-min</a> ·{' '}
+          <a href="#/record-tier-a">Tier A</a>
+        </footer>
+      </main>
+    </div>
   )
 }

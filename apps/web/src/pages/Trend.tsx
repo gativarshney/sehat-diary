@@ -7,27 +7,27 @@ export default function Trend({ rows }: { rows: Entry[] }) {
   const newest = rows.reduce((m, r) => Math.max(m, r.ts), 0)
   const since = useMemo(() => newest - 14 * 24 * 3600 * 1000, [newest])
   const recent = rows.filter((r) => r.ts >= since)
-  const series: { label: string; points: { ts: number; v: number }[] }[] = [
-    { label: 'BP systolic', points: recent.filter((r) => r.kind === 'bp' && r.finalValues.length >= 2).map((r) => ({ ts: r.ts, v: r.finalValues[0] })) },
-    { label: 'BP diastolic', points: recent.filter((r) => r.kind === 'bp' && r.finalValues.length >= 2).map((r) => ({ ts: r.ts, v: r.finalValues[1] })) },
-    { label: 'Sugar', points: recent.filter((r) => r.kind === 'sugar' && r.finalValues.length).map((r) => ({ ts: r.ts, v: r.finalValues[0] })) },
-    { label: 'Weight', points: recent.filter((r) => r.kind === 'weight' && r.finalValues.length).map((r) => ({ ts: r.ts, v: r.finalValues[0] })) },
+  const series: { label: string; unit: string; points: { ts: number; v: number }[] }[] = [
+    { label: 'बीपी ऊपर', unit: 'mmHg', points: recent.filter((r) => r.kind === 'bp' && r.finalValues.length >= 2).map((r) => ({ ts: r.ts, v: r.finalValues[0] })) },
+    { label: 'बीपी नीचे', unit: 'mmHg', points: recent.filter((r) => r.kind === 'bp' && r.finalValues.length >= 2).map((r) => ({ ts: r.ts, v: r.finalValues[1] })) },
+    { label: 'शुगर', unit: 'mg/dL', points: recent.filter((r) => r.kind === 'sugar' && r.finalValues.length).map((r) => ({ ts: r.ts, v: r.finalValues[0] })) },
+    { label: 'वज़न', unit: 'kg', points: recent.filter((r) => r.kind === 'weight' && r.finalValues.length).map((r) => ({ ts: r.ts, v: r.finalValues[0] })) },
   ].filter((s) => s.points.length >= 2)
   if (!series.length) return null
   return (
-    <section className="trend">
-      <h2>14 दिन</h2>
+    <div className="card">
+      <h2>पिछले 14 दिन</h2>
       <div className="sparks">
         {series.map((s) => (
-          <Spark key={s.label} label={s.label} points={s.points} />
+          <Spark key={s.label} label={s.label} unit={s.unit} points={s.points} />
         ))}
       </div>
-    </section>
+    </div>
   )
 }
 
-function Spark({ label, points }: { label: string; points: { ts: number; v: number }[] }) {
-  const w = 220
+function Spark({ label, unit, points }: { label: string; unit: string; points: { ts: number; v: number }[] }) {
+  const w = 240
   const h = 56
   const sorted = [...points].sort((a, b) => a.ts - b.ts)
   const xs = sorted.map((p) => p.ts)
@@ -42,12 +42,13 @@ function Spark({ label, points }: { label: string; points: { ts: number; v: numb
   const last = sorted[sorted.length - 1]
   return (
     <div className="spark">
-      <div className="label">
-        {label} <span className="muted">{y0} to {y1}</span>
+      <div className="label">{label}</div>
+      <div className="range">
+        {last.v} <span className="tiny">{unit} · {y0} se {y1}</span>
       </div>
-      <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img" aria-label={`${label} trend`}>
-        <path d={d} fill="none" stroke="currentColor" strokeWidth="2" />
-        <circle cx={sx(last.ts)} cy={sy(last.v)} r="3" fill="currentColor" />
+      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} preserveAspectRatio="none" role="img" aria-label={`${label} trend`}>
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={sx(last.ts)} cy={sy(last.v)} r="4" fill="currentColor" />
       </svg>
     </div>
   )
