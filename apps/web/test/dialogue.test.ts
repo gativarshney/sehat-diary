@@ -21,16 +21,17 @@ describe('guessKind', () => {
 
 describe('readbackText', () => {
   it('asks only when doubtful', () => {
-    const confident = readbackText('bp', parsed('BP ek sau bees by assi'))
+    const confident = readbackText('bp', parsed('BP ek sau bees by assi'), false)
     expect(confident.asksConfirm).toBe(false)
     expect(confident.text).toContain('120')
-    const doubtful = readbackText('sugar', parsed('sugar dedh sau'))
+    const doubtful = readbackText('sugar', parsed('sugar dedh sau'), false)
     expect(doubtful.asksConfirm).toBe(true)
     expect(doubtful.text).toContain('150')
     expect(doubtful.text).toContain('सही है')
   })
   it('handles no number', () => {
-    expect(readbackText('other', parsed('aaj mausam')).asksConfirm).toBe(false)
+    expect(readbackText('other', parsed('aaj mausam'), false).asksConfirm).toBe(false)
+    expect(readbackText('bp', parsed('BP ek sau bees by assi'), true).asksConfirm).toBe(true)
   })
 })
 

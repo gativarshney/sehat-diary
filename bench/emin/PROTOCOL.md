@@ -36,4 +36,4 @@ Silent errors are reported separately and count against the hypothesis regardles
 All 12 raw transcripts, parser outputs and tiers are recorded in `bench/emin/results/` (private, gitignored) and summarised in the lab ledger. Results are shared with Gnani in the submission, not published. Failures are reported in full.
 
 ## Amendments
-(none)
+- **2026-10-15, after the live run.** Official result: 7/12 recoverable (4 direct), 2 silent errors, decision "confirm-all mode". Observations: Prisma's ITN converts cardinals to digits but leaves fraction words in place ("डेढ़ 100", "सवा 100", "पौने 200"); "बटा अस्सी" was returned merged as "बटासी"; one clip (sugar_dhai) did not contain the full utterance (speech ended at 1.2 s), which is a recording fault, not a model fault. Parser changes made afterwards (fraction word followed by digits; known merged tokens; a BP utterance with a single number is doubtful) are post-hoc and do not change the official score. The app runs in confirm-all mode until Tier A shows the detector is reliable.

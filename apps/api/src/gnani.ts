@@ -20,6 +20,7 @@ export interface SttOptions {
   itnNativeNumerals?: boolean
   biasList?: string[]
   biasScore?: number
+  substitutions?: { patterns: string[]; replacement: string }[]
   purpose?: string
 }
 
@@ -72,6 +73,10 @@ export class GnaniClient {
     if (o.biasList?.length) {
       fd.append('bias_list', JSON.stringify(o.biasList))
       fd.append('bias_score', String(o.biasScore ?? 1.0))
+    }
+    if (o.substitutions?.length) {
+      fd.append('enable_substitution', 'true')
+      fd.append('substitution_map', JSON.stringify(o.substitutions.slice(0, 10)))
     }
     const r = await fetch(`${BASE}/stt/v3`, {
       method: 'POST',

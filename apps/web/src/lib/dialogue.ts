@@ -20,7 +20,17 @@ function fmt(v: number): string {
  * so numerals are sent as digits. Only doubtful readings get a question; confident ones get
  * a short confirmation statement instead (no question, no extra turn).
  */
-export function readbackText(kind: Kind, p: ParseResult): { text: string; asksConfirm: boolean } {
+/** Confirm-all mode (E-min decision rule): ask about every value until the doubt detector is validated on Tier A. */
+export function confirmAllEnabled(): boolean {
+  try {
+    const v = localStorage.getItem('sehat.confirmAll')
+    return v === null ? true : v === '1'
+  } catch {
+    return true
+  }
+}
+
+export function readbackText(kind: Kind, p: ParseResult, confirmAll = confirmAllEnabled()): { text: string; asksConfirm: boolean } {
   const v = p.values
   let core = ''
   if (kind === 'bp' && (p.bp || v.length >= 2)) {
@@ -32,7 +42,7 @@ export function readbackText(kind: Kind, p: ParseResult): { text: string; asksCo
   else if (v.length) core = `${fmt(v[0])}`
   else return { text: 'मुझे कोई नंबर नहीं मिला। कृपया दोबारा बोलें।', asksConfirm: false }
 
-  if (p.doubt) return { text: `${core}, सही है?`, asksConfirm: true }
+  if (p.doubt || confirmAll) return { text: `${core}, सही है?`, asksConfirm: true }
   return { text: `ठीक है, ${core} नोट कर लिया।`, asksConfirm: false }
 }
 

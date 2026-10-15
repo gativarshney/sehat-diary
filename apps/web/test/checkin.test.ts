@@ -10,7 +10,7 @@ function parsed(text: string): ParseResult {
 
 describe('check-in state machine', () => {
   it('runs a confident session without any confirmation', () => {
-    let { state, step } = startCheckIn(['medicine', 'bp', 'sugar'])
+    let { state, step } = startCheckIn(['medicine', 'bp', 'sugar'], { confirmAll: false })
     expect(step.kind).toBe('ask')
     ;({ state, step } = answer(state, step, 'haan le li', parsed('haan le li')))
     expect(step).toMatchObject({ kind: 'ask', slot: 'bp' })
@@ -25,7 +25,7 @@ describe('check-in state machine', () => {
   })
 
   it('confirms only doubtful values and applies a spoken correction', () => {
-    let { state, step } = startCheckIn(['sugar'])
+    let { state, step } = startCheckIn(['sugar'], { confirmAll: false })
     ;({ state, step } = answer(state, step, 'sugar dedh sau', parsed('sugar dedh sau')))
     expect(step).toMatchObject({ kind: 'confirm', slot: 'sugar' })
     expect((step as Extract<Step, { kind: 'confirm' }>).text).toContain('150')
@@ -35,7 +35,7 @@ describe('check-in state machine', () => {
   })
 
   it('accepts a bare yes on a doubtful value', () => {
-    let { state, step } = startCheckIn(['bp'])
+    let { state, step } = startCheckIn(['bp'], { confirmAll: false })
     ;({ state, step } = answer(state, step, 'ek sau chauvan chauranve', parsed('ek sau chauvan chauranve')))
     expect(step.kind).toBe('confirm')
     ;({ state, step } = answer(state, step, 'haan', parsed('haan')))
@@ -44,19 +44,19 @@ describe('check-in state machine', () => {
   })
 
   it('corrects only the systolic value when one number is given for bp', () => {
-    let { state, step } = startCheckIn(['bp'])
+    let { state, step } = startCheckIn(['bp'], { confirmAll: false })
     ;({ state, step } = answer(state, step, 'ek sau chauvan chauranve', parsed('ek sau chauvan chauranve')))
     ;({ state, step } = answer(state, step, 'nahi ek sau pachas', parsed('nahi ek sau pachas')))
     expect(state.answers[0].values).toEqual([150, 94])
   })
 
   it('re-asks on "no" and skips after repeated misunderstandings', () => {
-    let { state, step } = startCheckIn(['sugar'])
+    let { state, step } = startCheckIn(['sugar'], { confirmAll: false })
     ;({ state, step } = answer(state, step, 'pata nahi', parsed('pata nahi')))
     expect(step.kind).toBe('done')
     expect(state.answers[0].skipped).toBe(true)
 
-    ;({ state, step } = startCheckIn(['weight']))
+    ;({ state, step } = startCheckIn(['weight'], { confirmAll: false }))
     ;({ state, step } = answer(state, step, 'hmm', parsed('hmm')))
     expect(step).toMatchObject({ kind: 'ask', slot: 'weight' })
     ;({ state, step } = answer(state, step, 'kya', parsed('kya')))
@@ -65,8 +65,17 @@ describe('check-in state machine', () => {
     expect(state.answers[0].skipped).toBe(true)
   })
 
+  it('confirm-all mode asks even for a confident value', () => {
+    let { state, step } = startCheckIn(['bp'], { confirmAll: true })
+    ;({ state, step } = answer(state, step, 'ek sau bees by assi', parsed('ek sau bees by assi')))
+    expect(step.kind).toBe('confirm')
+    ;({ state, step } = answer(state, step, 'haan', parsed('haan')))
+    expect(step.kind).toBe('done')
+    expect(state.answers[0].values).toEqual([120, 80])
+  })
+
   it('records medicine not taken', () => {
-    let { state, step } = startCheckIn(['medicine'])
+    let { state, step } = startCheckIn(['medicine'], { confirmAll: false })
     ;({ state, step } = answer(state, step, 'nahi li', parsed('nahi li')))
     expect(step.kind).toBe('done')
     expect(state.answers[0].taken).toBe(false)

@@ -92,7 +92,13 @@ export function buildApp(opts: AppOptions) {
     if (!liveAllowed(c.req.raw.headers)) return c.json({ error: 'rate limit: try again later' }, 429)
     try {
       const biasList = (process.env.SEHAT_BIAS_LIST ?? '').split(',').map((s) => s.trim()).filter(Boolean)
-      const r = await client.transcribe(bytes, 'api-clip', { languageCode, purpose: 'api-stt', biasList: biasList.length ? biasList : undefined })
+      let substitutions: { patterns: string[]; replacement: string }[] | undefined
+      try {
+        substitutions = process.env.SEHAT_SUBSTITUTIONS ? JSON.parse(process.env.SEHAT_SUBSTITUTIONS) : undefined
+      } catch {
+        substitutions = undefined
+      }
+      const r = await client.transcribe(bytes, 'api-clip', { languageCode, purpose: 'api-stt', biasList: biasList.length ? biasList : undefined, substitutions })
       return c.json({ transcript: r.transcript, request_id: r.requestId, mock: false, seconds })
     } catch (e) {
       if (e instanceof CreditCapExceeded) return c.json({ error: String(e.message) }, 402)

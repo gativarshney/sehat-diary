@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { health } from './lib/api'
+import { confirmAllEnabled } from './lib/dialogue'
 import Capture from './pages/Capture'
 import CheckIn from './pages/CheckIn'
 import EminRecorder from './pages/EminRecorder'
@@ -20,6 +21,15 @@ export default function App() {
   const route = useHashRoute()
   const [mode, setMode] = useState<string>('offline')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [confirmAll, setConfirmAll] = useState(confirmAllEnabled())
+  function toggleConfirmAll(v: boolean) {
+    setConfirmAll(v)
+    try {
+      localStorage.setItem('sehat.confirmAll', v ? '1' : '0')
+    } catch {
+      /* storage unavailable */
+    }
+  }
 
   // The free API instance sleeps when idle; poll health until it answers (about a minute on cold start).
   useEffect(() => {
@@ -59,6 +69,12 @@ export default function App() {
       <Capture apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
       <CheckIn apiMode={mode} onSaved={() => setRefreshKey((k) => k + 1)} />
       <History refreshKey={refreshKey} />
+      <p className="muted small">
+        <label>
+          <input type="checkbox" checked={confirmAll} onChange={(e) => toggleConfirmAll(e.target.checked)} /> confirm every value (on until the doubt
+          detector is validated)
+        </label>
+      </p>
       <footer className="muted small">
         Not a medical device. No advice. Synthetic data in demos. Built on Gnani Prisma and Timbre. <a href="#/record-emin">E-min recorder</a> · <a href="#/record-tier-a">Tier A recorder</a>
       </footer>

@@ -86,9 +86,17 @@ const HALF_WORDS = new Set(['aadha', 'adha', 'आधा'])
 const BP_SEP = new Set(['by', 'bata', 'batta', 'बटा', 'बाय', '/', 'over', 'upon'])
 const BP_UPAR = new Set(['upar', 'ऊपर', 'oopar'])
 const BP_NEECHE = new Set(['neeche', 'niche', 'नीचे'])
+const BP_WORDS = new Set(['bp', 'बीपी', 'blood', 'प्रेशर', 'pressure', 'ब्लड'])
 const CORRECTION = new Set(['nahi', 'nahin', 'नहीं', 'नही', 'galat', 'ग़लत', 'गलत'])
 
 const DEV_DIGITS = '०१२३४५६७८९'
+
+/** Tokens Prisma has been observed to merge; split before parsing. Mirrors the server-side substitution map. */
+export const KNOWN_MERGES: Record<string, string[]> = {
+  'बटासी': ['बटा', 'अस्सी'],
+  'बटाअस्सी': ['बटा', 'अस्सी'],
+  'बायअस्सी': ['बाय', 'अस्सी'],
+}
 
 /** Map Devanagari digits to ASCII and drop commas inside integers. */
 export function normalizeDigits(text: string): string {
@@ -105,7 +113,10 @@ export function tokenize(text: string): string[] {
   t = t.replace(/(\d)\s*\.\s*(\d)/g, '$1 . $2')
   t = t.replace(/\//g, ' / ')
   t = t.replace(/[,;!?।]/g, ' ')
-  return t.split(/\s+/).filter(Boolean)
+  return t
+    .split(/\s+/)
+    .filter(Boolean)
+    .flatMap((tok) => KNOWN_MERGES[tok] ?? [tok])
 }
 
 const isDigits = (s: string) => /^\d+$/.test(s)
@@ -124,6 +135,15 @@ export function wordsToNumbers(tokens: string[]): Candidate[] {
       let j = i + 1
       let base: number | null = null
       let unit = 1
+      if (j < n && isDigits(tokens[j])) {
+        // ITN output: fraction word + digits. The fraction applies to the leading power of ten.
+        const num = Number(tokens[j])
+        const pow = num >= 10 ? 10 ** Math.floor(Math.log10(num)) : 1
+        const value = kind === 'mul' ? (HALF_WORDS.has(tok) ? num * f : num + (f - 1) * pow) : num - f * pow
+        if (value > 0) out.push({ value, span: [start, j + 1], source: 'fraction' })
+        i = j + 1
+        continue
+      }
       if (j < n && WORD_TO_NUM.has(tokens[j]) && !HUNDRED.has(tokens[j])) {
         base = WORD_TO_NUM.get(tokens[j])!
         j++
@@ -239,6 +259,10 @@ export function parseNumbers(text: string): ParseResult {
     }
   }
 
+  if (numbers.length === 1 && tokens.some((t) => BP_WORDS.has(t))) {
+    res.doubt = true
+    res.reasons.push('blood pressure with a single number')
+  }
   if (numbers.some((c) => c.source === 'fraction')) {
     res.doubt = true
     res.reasons.push('fraction word')

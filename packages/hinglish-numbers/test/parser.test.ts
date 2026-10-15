@@ -23,6 +23,16 @@ const cases: [string, number[]][] = [
   ['sugar ek sau chhabbees', [126]],
   ['do hazaar paanch', [2005]],
   ['sawa do sau', [225]],
+  // forms observed in the live E-min transcripts (Prisma ITN keeps fraction words, converts the rest)
+  ['शुगर फास्टिंग डेढ़ 100', [150]],
+  ['शुगर सवा 100 था', [125]],
+  ['पौने 200', [175]],
+  ['ढाई 100', [250]],
+  ['सवा 200', [225]],
+  ['डेढ़ 1000', [1500]],
+  ['ब्लड प्रेशर 120 बटासी', [120, 80]],
+  ['बीपी 154 94', [154, 94]],
+  ['अरे नहीं 128', [128]],
   ['aadha kilo', [0.5]],
 ]
 
@@ -64,6 +74,11 @@ describe('corrections', () => {
     const r2 = parseNumbers('nahi atthais')
     expect(r2.isCorrection).toBe(true)
     expect(r2.values).toEqual([28])
+  })
+  it('a bp utterance with one number is doubtful', () => {
+    const r = parseNumbers('ब्लड प्रेशर 120')
+    expect(r.values).toEqual([120])
+    expect(r.doubt).toBe(true)
   })
   it('a plain reading is not a correction', () => {
     expect(parseNumbers('sugar dedh sau').isCorrection).toBe(false)

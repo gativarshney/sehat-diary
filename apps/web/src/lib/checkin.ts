@@ -7,7 +7,7 @@
  * decides what to say next and what to store.
  */
 import type { ParseResult } from './api'
-import { interpretConfirmation } from './dialogue'
+import { confirmAllEnabled, interpretConfirmation } from './dialogue'
 
 export type Slot = 'medicine' | 'bp' | 'sugar' | 'weight'
 
@@ -34,6 +34,8 @@ export interface CheckInState {
   answers: SlotAnswer[]
   pending: SlotAnswer | null
   retries: number
+  /** confirm every value regardless of doubt (E-min decision rule until Tier A validates the detector) */
+  confirmAll: boolean
 }
 
 const PROMPTS: Record<Slot, string> = {
@@ -45,8 +47,8 @@ const PROMPTS: Record<Slot, string> = {
 
 const MAX_RETRIES = 2
 
-export function startCheckIn(slots: Slot[] = ['medicine', 'bp', 'sugar']): { state: CheckInState; step: Step } {
-  const state: CheckInState = { slots, index: 0, answers: [], pending: null, retries: 0 }
+export function startCheckIn(slots: Slot[] = ['medicine', 'bp', 'sugar'], opts: { confirmAll?: boolean } = {}): { state: CheckInState; step: Step } {
+  const state: CheckInState = { slots, index: 0, answers: [], pending: null, retries: 0, confirmAll: opts.confirmAll ?? confirmAllEnabled() }
   return { state, step: { kind: 'ask', slot: slots[0], text: `नमस्ते। ${PROMPTS[slots[0]]}` } }
 }
 
@@ -125,7 +127,7 @@ export function answer(state: CheckInState, step: Step, heard: string, parsed: P
   if (!enough) return retryOrSkip(state, slot, heard, PROMPTS[slot])
 
   const a: SlotAnswer = { slot, values: slot === 'bp' ? values.slice(0, 2) : values.slice(0, 1), heard, doubt: parsed.doubt, reasons: parsed.reasons, corrected: false, skipped: false }
-  if (parsed.doubt) {
+  if (parsed.doubt || state.confirmAll) {
     return { state: { ...state, pending: a, retries: 0 }, step: { kind: 'confirm', slot, text: readback(slot, a.values), pending: a } }
   }
   const s = { ...state, answers: [...state.answers, a], index: state.index + 1, retries: 0 }
