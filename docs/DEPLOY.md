@@ -1,5 +1,7 @@
 # Deployment (free tiers only, no card)
 
+Current deployment (15 Oct 2026): blueprint `sehat-diary` on Render; API at https://sehat-diary-api.onrender.com, web at https://sehat-diary.onrender.com. GNANI_MODE is `mock` until the key is set and live mode is approved.
+
 ## API on Render (free web service)
 1. Render dashboard: New, Blueprint, connect this repository. `render.yaml` defines the service.
 2. Set `GNANI_API_KEY` in the service's Environment tab (marked `sync: false` in the blueprint, so it is never in the repo).

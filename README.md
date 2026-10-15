@@ -9,6 +9,12 @@ Built for the Great Indian AI Internship Challenge 2026 on Gnani AI's speech mod
 - Gnani Prisma v2.5 speech-to-text (REST `/stt/v3` with `format=transcribe` and word boosting; realtime `/stt/v3/stream` through a server-side WebSocket proxy)
 - Gnani Timbre text-to-speech (REST `/api/v1/tts/inference`)
 
+## Live demo
+
+- App: https://sehat-diary.onrender.com (free tier; the API sleeps after 15 minutes idle and takes about a minute to wake, the page shows "server waking up")
+- API health: https://sehat-diary-api.onrender.com/healthz
+- "Try sample (no mic)" exercises the whole flow without spending any credits.
+
 ## What it is not
 
 It is not a medical device and gives no advice, thresholds or interpretation. It records, confirms, corrects and keeps history for the family to share with their doctor. All demo data is synthetic.
