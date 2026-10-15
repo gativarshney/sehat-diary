@@ -1,80 +1,65 @@
 import { phoneDegrade, type PhoneOptions } from './phone'
-import { encodeWav, floatTo16, resample } from './wav'
+import { analyzeDropouts, encodeWav, floatTo16, type DropoutReport } from './wav'
 
 export const TARGET_RATE = 16000
 
 /**
  * Push-to-talk microphone recorder producing 16 kHz mono 16-bit WAV.
- * Uses an AudioWorklet (inline module) to collect Float32 frames, then resamples
- * to 16 kHz on stop. Echo cancellation and noise suppression are requested from the
- * browser so playback of the app's own voice is less likely to be captured.
+ *
+ * Uses MediaRecorder (the browser's own capture pipeline, which buffers reliably) and decodes the
+ * result through an OfflineAudioContext at 16 kHz, which also performs the resampling. An earlier
+ * AudioWorklet-based version dropped frames on some machines (exact-zero gaps inside speech), so
+ * every take is now checked with `analyzeDropouts` and the report is returned to the caller.
  */
 export class Recorder {
-  private ctx: AudioContext | null = null
   private stream: MediaStream | null = null
-  private node: AudioWorkletNode | null = null
-  private chunks: Float32Array[] = []
-  private startedAt = 0
-  private inputRate = TARGET_RATE
-  private _level = 0
-
-  get level(): number {
-    return this._level
-  }
+  private rec: MediaRecorder | null = null
+  private chunks: Blob[] = []
+  private stopped: Promise<void> | null = null
+  private resolveStopped: (() => void) | null = null
 
   async start(): Promise<void> {
     this.chunks = []
     this.stream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: false, autoGainControl: true },
     })
-    this.ctx = new AudioContext()
-    this.inputRate = this.ctx.sampleRate
-    const workletSrc = `
-      class PcmTap extends AudioWorkletProcessor {
-        process(inputs) {
-          const ch = inputs[0] && inputs[0][0];
-          if (ch) this.port.postMessage(ch.slice(0));
-          return true;
-        }
-      }
-      registerProcessor('pcm-tap', PcmTap);`
-    const url = URL.createObjectURL(new Blob([workletSrc], { type: 'application/javascript' }))
-    await this.ctx.audioWorklet.addModule(url)
-    URL.revokeObjectURL(url)
-    const src = this.ctx.createMediaStreamSource(this.stream)
-    this.node = new AudioWorkletNode(this.ctx, 'pcm-tap')
-    this.node.port.onmessage = (e: MessageEvent<Float32Array>) => {
-      const f = e.data
-      this.chunks.push(f)
-      let sum = 0
-      for (let i = 0; i < f.length; i++) sum += f[i] * f[i]
-      this._level = Math.sqrt(sum / f.length)
+    const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m))
+    this.rec = new MediaRecorder(this.stream, mime ? { mimeType: mime, audioBitsPerSecond: 64000 } : undefined)
+    this.rec.ondataavailable = (e) => {
+      if (e.data.size > 0) this.chunks.push(e.data)
     }
-    src.connect(this.node)
-    // Do not connect the node to destination: we never play the mic back.
-    this.startedAt = performance.now()
+    this.stopped = new Promise<void>((res) => (this.resolveStopped = res))
+    this.rec.onstop = () => this.resolveStopped?.()
+    this.rec.start(250)
   }
 
-  /** Stop and return the WAV blob plus duration in seconds. Pass phone options to degrade the clip. */
-  async stop(phone?: PhoneOptions | null): Promise<{ blob: Blob; seconds: number }> {
-    const total = this.chunks.reduce((n, c) => n + c.length, 0)
-    const merged = new Float32Array(total)
-    let off = 0
-    for (const c of this.chunks) {
-      merged.set(c, off)
-      off += c.length
-    }
-    this.node?.disconnect()
-    this.stream?.getTracks().forEach((t) => t.stop())
-    await this.ctx?.close()
-    this.node = null
+  /** Stop and return the WAV blob, duration, and a dropout report. Pass phone options to degrade the clip. */
+  async stop(phone?: PhoneOptions | null): Promise<{ blob: Blob; seconds: number; report: DropoutReport }> {
+    if (!this.rec || !this.stream) throw new Error('recorder not started')
+    if (this.rec.state !== 'inactive') this.rec.stop()
+    await this.stopped
+    this.stream.getTracks().forEach((t) => t.stop())
+    const encoded = new Blob(this.chunks, { type: this.rec.mimeType || 'audio/webm' })
+    this.rec = null
     this.stream = null
-    this.ctx = null
-    let pcm = resample(merged, this.inputRate, TARGET_RATE)
+
+    const arrayBuf = await encoded.arrayBuffer()
+    // decode at native rate first (OfflineAudioContext needs a length; use a generous bound then trim)
+    const probe = new AudioContext()
+    const decoded = await probe.decodeAudioData(arrayBuf.slice(0))
+    await probe.close()
+    const length = Math.ceil(decoded.duration * TARGET_RATE)
+    const off = new OfflineAudioContext(1, Math.max(1, length), TARGET_RATE)
+    const src = off.createBufferSource()
+    src.buffer = decoded
+    src.connect(off.destination)
+    src.start()
+    const rendered = await off.startRendering()
+    let pcm: Float32Array = rendered.getChannelData(0)
     if (phone) pcm = phoneDegrade(pcm, TARGET_RATE, phone)
-    const blob = encodeWav(floatTo16(pcm), TARGET_RATE)
-    const seconds = pcm.length / TARGET_RATE
-    void this.startedAt
-    return { blob, seconds }
+    const i16 = floatTo16(pcm)
+    const report = analyzeDropouts(i16, TARGET_RATE)
+    const blob = encodeWav(i16, TARGET_RATE)
+    return { blob, seconds: pcm.length / TARGET_RATE, report }
   }
 }

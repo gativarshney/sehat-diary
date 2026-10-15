@@ -61,3 +61,4 @@ footer { margin-top: 32px; }
 .sparks { display: flex; gap: 16px; flex-wrap: wrap; }
 .spark { color: var(--accent-2); }
 .phonebar { margin-top: 8px; }
+.tag.bad { background: #fecaca; }

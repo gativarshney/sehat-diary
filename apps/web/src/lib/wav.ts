@@ -47,3 +47,74 @@ export function resample(input: Float32Array, from: number, to: number): Float32
   }
   return out
 }
+
+export interface DropoutReport {
+  seconds: number
+  peak: number // 0..32767
+  speechStart: number // seconds
+  speechEnd: number
+  zeroWindows: number // 20 ms windows of exact digital zero inside the speech region
+  longestGapMs: number
+  ok: boolean
+  reason?: string
+}
+
+/**
+ * Detects capture dropouts: runs of exact digital zeros inside the speech region. Natural pauses
+ * contain microphone noise and never hit exact zero for 20 ms, so zero windows mean lost audio.
+ */
+export function analyzeDropouts(samples: Int16Array, rate: number): DropoutReport {
+  const win = Math.floor(rate / 50)
+  const n = Math.floor(samples.length / win)
+  const rms: number[] = []
+  const zero: boolean[] = []
+  let peak = 0
+  for (let i = 0; i < n; i++) {
+    let sum = 0
+    let allZero = true
+    for (let j = i * win; j < (i + 1) * win; j++) {
+      const v = samples[j]
+      sum += v * v
+      if (v !== 0) allZero = false
+      const a = Math.abs(v)
+      if (a > peak) peak = a
+    }
+    rms.push(Math.sqrt(sum / win))
+    zero.push(allZero)
+  }
+  const active = rms.map((r) => r > 300)
+  const first = active.indexOf(true)
+  const last = active.lastIndexOf(true)
+  const seconds = samples.length / rate
+  if (first < 0) return { seconds, peak, speechStart: 0, speechEnd: 0, zeroWindows: 0, longestGapMs: 0, ok: false, reason: 'no speech detected (too quiet?)' }
+  let zeroWindows = 0
+  let run = 0
+  let longest = 0
+  for (let i = first; i <= last; i++) {
+    if (zero[i]) {
+      zeroWindows++
+      run++
+      if (run > longest) longest = run
+    } else run = 0
+  }
+  const report: DropoutReport = {
+    seconds,
+    peak,
+    speechStart: first * 0.02,
+    speechEnd: (last + 1) * 0.02,
+    zeroWindows,
+    longestGapMs: longest * 20,
+    ok: true,
+  }
+  if (zeroWindows > 2) {
+    report.ok = false
+    report.reason = `audio dropped out ${zeroWindows} times (longest ${longest * 20} ms); re-record`
+  } else if (peak > 32000) {
+    report.ok = false
+    report.reason = 'clipping (too loud); move the mic further away and re-record'
+  } else if (seconds < 1.5) {
+    report.ok = false
+    report.reason = 'too short'
+  }
+  return report
+}

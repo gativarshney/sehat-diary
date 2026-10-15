@@ -70,9 +70,9 @@ export default function Capture({ apiMode, onSaved }: { apiMode: string; onSaved
     await new Promise<void>((res) => {
       stopResolver.current = res
     })
-    const out = await rec.current.stop(phoneMode === 'off' ? null : { noiseLevel: phoneMode === 'noisy' ? 0.12 : 0.03, seed: 42 })
+    const { blob, seconds } = await rec.current.stop(phoneMode === 'off' ? null : { noiseLevel: phoneMode === 'noisy' ? 0.12 : 0.03, seed: 42 })
     rec.current = null
-    return out
+    return { blob, seconds }
   }
   const stopResolver = useRef<(() => void) | null>(null)
   function stopListening() {

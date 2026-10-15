@@ -54,3 +54,20 @@ describe('wav utilities', () => {
     expect(Array.from(i16)).toEqual([32767, -32768, 0])
   })
 })
+
+describe('analyzeDropouts', () => {
+  it('flags exact-zero gaps inside speech and accepts clean speech', async () => {
+    const { analyzeDropouts } = await import('../src/lib/wav')
+    const rate = 16000
+    const s = new Int16Array(rate * 3)
+    // 2 s of "speech": noisy tone from 0.5 s to 2.5 s
+    for (let i = rate * 0.5; i < rate * 2.5; i++) s[i] = Math.round(4000 * Math.sin(i / 7) + ((i * 7919) % 97) - 48)
+    expect(analyzeDropouts(s, rate).ok).toBe(true)
+    // punch a 200 ms hole of exact zeros in the middle
+    for (let i = rate * 1.4; i < rate * 1.6; i++) s[i] = 0
+    const r = analyzeDropouts(s, rate)
+    expect(r.ok).toBe(false)
+    expect(r.zeroWindows).toBeGreaterThanOrEqual(9)
+    expect(r.longestGapMs).toBeGreaterThanOrEqual(180)
+  })
+})
