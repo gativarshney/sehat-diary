@@ -31,7 +31,6 @@ services:
   - type: web
     name: sehat-diary
     runtime: static
-    plan: free
     buildCommand: npm ci && npm run build -w apps/web
     staticPublishPath: apps/web/dist
     envVars:
