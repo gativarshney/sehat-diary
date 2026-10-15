@@ -87,7 +87,7 @@ async function main() {
   console.log(`\nrecoverable: ${recoverable}/${rows.length}   tier1: ${rows.filter((r) => r.tier === 'tier1').length}   silent errors: ${silent}`)
   console.log('decision rule ->', decision)
 
-  if (live && !skipTts) {
+  if (live && !skipTts && !only) {
     for (const v of TTS_CHECKS.voices) {
       const audio = await client.synthesize(TTS_CHECKS.text, { ...v, purpose: 'emin-tts' })
       const out = join(resultsDir, `tts_${v.voice}.wav`)
