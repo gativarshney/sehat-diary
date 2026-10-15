@@ -47,6 +47,18 @@ const PROMPTS: Record<Slot, string> = {
 
 const MAX_RETRIES = 2
 
+/** Keywords that identify a reading type in an utterance; used to catch "answering the next question" during a confirmation. */
+const SLOT_WORDS: Record<Slot, RegExp> = {
+  medicine: /dawai|दवाई|dawa|दवा|goli|गोली|tablet|टैबलेट/i,
+  bp: /bp|बीपी|blood|प्रेशर|pressure|ब्लड/i,
+  sugar: /sugar|शुगर|glucose|ग्लूकोज|fasting|फास्टिंग/i,
+  weight: /weight|वेट|वज़न|वजन|vajan|vazan|wazan|kilo|किलो/i,
+}
+
+function mentionsOtherSlot(text: string, slot: Slot): boolean {
+  return (Object.keys(SLOT_WORDS) as Slot[]).some((s) => s !== slot && SLOT_WORDS[s].test(text))
+}
+
 export function startCheckIn(slots: Slot[] = ['medicine', 'bp', 'sugar'], opts: { confirmAll?: boolean } = {}): { state: CheckInState; step: Step } {
   const state: CheckInState = { slots, index: 0, answers: [], pending: null, retries: 0, confirmAll: opts.confirmAll ?? confirmAllEnabled() }
   return { state, step: { kind: 'ask', slot: slots[0], text: `नमस्ते। ${PROMPTS[slots[0]]}` } }
@@ -87,8 +99,13 @@ export function answer(state: CheckInState, step: Step, heard: string, parsed: P
   if (step.kind === 'done' || step.kind === 'say') return { state, step: nextAsk(state) }
 
   if (step.kind === 'confirm') {
-    const c = interpretConfirmation(heard, parsed)
     const pending = step.pending
+    // A different reading type spoken during a confirmation is not a correction: re-ask, do not overwrite.
+    if (mentionsOtherSlot(heard, pending.slot)) {
+      if (state.retries >= MAX_RETRIES) return skip(state, pending.slot, heard)
+      return { state: { ...state, retries: state.retries + 1 }, step: { kind: 'confirm', slot: pending.slot, text: `पहले बताइए, ${readback(pending.slot, pending.values)}`, pending } }
+    }
+    const c = interpretConfirmation(heard, parsed)
     if (c.type === 'yes') {
       const s = { ...state, answers: [...state.answers, { ...pending, doubt: false }], pending: null, index: state.index + 1, retries: 0 }
       return { state: s, step: nextAsk(s) }

@@ -13,7 +13,7 @@ interface Turn {
 }
 
 /** Scripted answers used when the API is in mock mode (no microphone, no credits). */
-const MOCK_SCRIPT = ['haan le li', 'ek sau atthais by bayasi', 'sugar dedh sau', 'haan']
+const MOCK_SCRIPT = ['haan le li', 'ek sau atthais by bayasi', 'haan', 'sugar dedh sau', 'nahi, ek sau pachpan']
 const SLOTS = ['medicine', 'bp', 'sugar'] as const
 
 /**

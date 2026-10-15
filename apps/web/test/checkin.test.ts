@@ -74,6 +74,18 @@ describe('check-in state machine', () => {
     expect(state.answers[0].values).toEqual([120, 80])
   })
 
+  it('a different reading spoken during a confirmation does not overwrite the pending value', () => {
+    let { state, step } = startCheckIn(['bp', 'sugar'], { confirmAll: true })
+    ;({ state, step } = answer(state, step, 'ek sau atthais by bayasi', parsed('ek sau atthais by bayasi')))
+    expect(step.kind).toBe('confirm')
+    ;({ state, step } = answer(state, step, 'sugar dedh sau', parsed('sugar dedh sau')))
+    expect(step.kind).toBe('confirm')
+    expect(state.pending?.values).toEqual([128, 82])
+    ;({ state, step } = answer(state, step, 'haan', parsed('haan')))
+    expect(state.answers[0].values).toEqual([128, 82])
+    expect(step).toMatchObject({ kind: 'ask', slot: 'sugar' })
+  })
+
   it('records medicine not taken', () => {
     let { state, step } = startCheckIn(['medicine'], { confirmAll: false })
     ;({ state, step } = answer(state, step, 'nahi li', parsed('nahi li')))
